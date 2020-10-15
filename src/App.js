@@ -17,6 +17,7 @@ import {
   ToggleButtonGroup,
   ToggleButton,
 } from 'react-bootstrap';
+import Eth from 'web3-eth';
 import TradingViewWidget, { BarStyles } from 'react-tradingview-widget';
 import * as firebase from "firebase/app";
 import "firebase/firestore";
@@ -29,6 +30,7 @@ import bannerSrc from './banner.png';
 import metaMaskSrc from './metamask.svg';
 import constants from './constants';
 import './App.css';
+import config from './config';
 
 library.add(faSync);
 
@@ -39,6 +41,7 @@ class App extends Component {
     // Function bindings
     this.handleShow = this.handleShow.bind(this);
     this.handleClose = this.handleClose.bind(this);
+    this.handleFeedChange = this.handleFeedChange.bind(this);
     this.submitInviteCode = this.submitInviteCode.bind(this);
     this.addFunds = this.addFunds.bind(this);
     this.getQuote = this.getQuote.bind(this);
@@ -49,64 +52,92 @@ class App extends Component {
       account: null,
       positions: null,
       balance: null,
+      tokenAddress: '0x74a653d735f79c1d7c817023c8740465a8be43a6',
       feeds: {
-        'XAUUSD': {
-          name: 'GOLD SPOT / U.S. DOLLAR',
-          symbol: 'XAUUSD',
-          chartSymbol: 'XAUUSD',
-          price: '',
-          denom: 'USD',
-          // TODO: minLeverage, maxLeverage
-        },
-        'BCOUSD': {
-          name: 'BRENT CRUDE OIL',
-          symbol: 'BCOUSD',
-          chartSymbol: 'BCOUSD',
-          price: '',
-          denom: 'USD',
-        },
-        'NASDAQ-TSLA': {
-          name: 'TSLA',
-          symbol: 'NASDAQ-TSLA',
-          chartSymbol: 'NASDAQ:TSLA',
-          price: '',
-          denom: 'USD',
-        },
-        'INDEX-VIX': {
-          name: 'VIX',
-          symbol: 'INDEX-VIX',
-          chartSymbol: 'INDEX:VIX',
-          price: '',
-          denom: '',
-        },
-        'BITFINEX-DAIUSD': {
-          name: 'DAI',
-          symbol: 'BITFINEX-DAIUSD',
-          chartSymbol: 'BITFINEX:DAIUSD',
-          price: '',
-          denom: 'USD',
-        },
         'COINBASE-BTCUSD': {
-          name: 'BTC',
+          name: 'BTC / USD',
           symbol: 'COINBASE-BTCUSD',
           chartSymbol: 'COINBASE:BTCUSD',
           price: '',
+          decimals: 8,
+          feedAddress: '0x8024a34755eE778387049738E6f8d8DB634C33aA',
+          feedABIType: 'ovlChainlinkFeedABI',
+          feedDataSourceAddress: '0xECe365B379E1dD183B20fc5f022230C044d51404',
+          marketAddress: '0x999403f37765ee7d5bfb1032e23d8b9241fdac72',
           denom: 'USD',
         },
-        'OVLDAI': {
-          name: 'OVL',
-          symbol: 'OVLDAI',
-          chartSymbol: 'OVLDAI',
+        'COINBASE-ETHUSD': {
+          name: 'ETH / USD',
+          symbol: 'COINBASE-ETHUSD',
+          chartSymbol: 'COINBASE:ETHUSD',
           price: '',
-          denom: 'DAI',
+          decimals: 8,
+          feedAddress: '',
+          feedABIType: 'ovlChainlinkFeedABI',
+          feedDataSourceAddress: '',
+          marketAddress: '',
+          denom: 'USD',
+        },
+        'CHAINLINK-FASTGAS': {
+          name: 'Fast Gas / Gwei',
+          symbol: 'CHAINLINK-FASTGAS',
+          chartSymbol: 'CHAINLINK:FASTGAS',
+          price: '',
+          decimals: 8,
+          feedAddress: '',
+          feedABIType: 'ovlChainlinkFeedABI',
+          feedDataSourceAddress: '',
+          marketAddress: '',
+          denom: 'ETH',
+        },
+        'UNISWAP-WBTCWETH': {
+          name: 'Wrapped BTC / ETH',
+          symbol: 'UNISWAP-WBTCWETH',
+          chartSymbol: 'UNISWAP:WBTCWETH',
+          price: '',
+          decimals: 0,
+          feedAddress: '',
+          feedABIType: 'ovlUniswapV2FeedABI',
+          feedDataSourceAddress: '',
+          marketAddress: '',
+          denom: 'ETH',
+        },
+        'UNISWAP-WETHUSDT': {
+          name: 'ETH / USDT',
+          symbol: 'UNISWAP-WETHUSDT',
+          chartSymbol: 'UNISWAP:WETHUSDT',
+          price: '',
+          decimals: 0,
+          feedAddress: '',
+          feedABIType: 'ovlUniswapV2FeedABI',
+          feedDataSourceAddress: '',
+          marketAddress: '',
+          denom: 'USD',
+        },
+        'UNISWAP-OVLETH': {
+          name: 'OVL / ETH',
+          symbol: 'UNISWAP-OVLETH',
+          chartSymbol: 'UNISWAP:OVLWETH',
+          price: '',
+          decimals: 0,
+          feedAddress: '',
+          feedABIType: 'ovlUniswapV2FeedABI',
+          feedDataSourceAddress: '',
+          marketAddress: '',
+          denom: 'ETH',
         }
       },
       inviteCode: '',
       feed: {
-        name: 'GOLD SPOT / U.S. DOLLAR',
-        symbol: 'XAUUSD',
-        chartSymbol: 'XAUUSD',
+        name: 'BTC / USD',
+        symbol: 'COINBASE-BTCUSD',
+        chartSymbol: 'COINBASE:BTCUSD',
         price: '',
+        decimals: 8,
+        feedAddress: '0x8024a34755eE778387049738E6f8d8DB634C33aA',
+        feedABIType: 'ovlChainlinkFeedABI',
+        feedDataSourceAddress: '0xECe365B379E1dD183B20fc5f022230C044d51404',
+        marketAddress: '0x999403f37765ee7d5bfb1032e23d8b9241fdac72',
         denom: 'USD',
       },
       show: false,
@@ -125,6 +156,12 @@ class App extends Component {
 
   handleShow() {
     this.setState({ show: true });
+  }
+
+  async handleFeedChange(e) {
+    const { feeds } = this.state;
+    await this.setState({ feed: feeds[e.target.value] });
+    await this.initializeFeed();
   }
 
   submitInviteCode = async () => {
@@ -168,7 +205,9 @@ class App extends Component {
       this.setState({ loadingPrice: true });
 
       // Fetch price quote from oracle for active feed in modal
-      const { symbol, price } = (await firebase.functions().httpsCallable('getQuote')({ symbol: feed.symbol })).data;
+      const eth = new Eth(window.ethereum);
+      const feedContract = new eth.Contract(config.dev[feed.feedABIType], feed.feedAddress);
+      const price = await feedContract.methods.getData().call();
 
       // Store price value in feeds and feed of state
       feeds[feed.symbol].price = feed.price = price
@@ -176,7 +215,7 @@ class App extends Component {
     } catch (err) {
       console.error(err);
       this.setState({ loadingPrice: false });
-      alert('Not able to get quote at this time');
+      //alert('Not able to get quote at this time');
     }
   }
 
@@ -220,7 +259,16 @@ class App extends Component {
       this.setState({ loadingTrade: false });
       alert(`Error executing trade: ${err.message}`);
     }
+  }
 
+  applyBaseFactor(amount, decimals) {
+    const base = Math.pow(10, decimals);
+    return amount * base;
+  }
+
+  removeBaseFactor(amount, decimals) {
+    const base = Math.pow(10, decimals);
+    return amount / base;
   }
 
   renderBalance() {
@@ -271,7 +319,7 @@ class App extends Component {
     const { total } = this.state;
     return (
       <Navbar bg="light" className="justify-content-center border-bottom">
-        <small>Circulating Supply: <strong>{(total.circulating ? `${Numeral(total.circulating).format('0,0.000')} OVL` : '')}</strong></small>
+        <small>Total Supply: <strong>{(total.supply ? `${Numeral(this.removeBaseFactor(total.supply, total.decimals)).format('0,0.000')} OVL` : '')}</strong></small>
       </Navbar>
     );
   }
@@ -282,16 +330,9 @@ class App extends Component {
       return (
         <div className="d-flex align-items-center">
           {this.renderBalance()}
-          <DropdownButton
-            title={`${account.substring(0, 6)}...${account.substring(account.length - 4)}`}
-            drop="down"
-            variant="light"
-            key="down"
-            id="dropdown-basic"
-            alignRight
-          >
-            <Dropdown.Item href="https://forms.gle/7Y8J5dka9ghrRrcX6" target="_blank">Provide Feedback</Dropdown.Item>
-          </DropdownButton>
+          <Button variant="light">
+            {`${account.substring(0, 6)}...${account.substring(account.length - 4)}`}
+          </Button>
         </div>
       );
     } else {
@@ -447,7 +488,7 @@ class App extends Component {
       return (
         <InputGroup className="mb-3">
           <div className="d-flex align-items-center">
-            <span className="h4">{feed.price}</span>
+            <span className="h4">{this.removeBaseFactor(feed.price, feed.decimals)} {feed.denom}</span>
             <Button className="ml-2" variant="link" size="sm" onClick={this.getQuote}>
               <FontAwesomeIcon icon="sync" />
             </Button>
@@ -492,7 +533,7 @@ class App extends Component {
   renderSelectFeed() {
     const { feeds, feed } = this.state;
     return (
-      <Form.Control as="select" className="my-2" defaultValue={feed.symbol} onChange={(e) => this.setState({ feed: feeds[e.target.value] })}>
+      <Form.Control as="select" className="my-2" defaultValue={feed.symbol} onChange={this.handleFeedChange}>
       {
         Object.keys(feeds).map(symbol => {
           const feed = feeds[symbol];
@@ -502,12 +543,34 @@ class App extends Component {
     );
   }
 
+  renderPriceInFeed() {
+    const { feed, loadingPrice } = this.state;
+    if (loadingPrice) {
+      return (
+        <Spinner
+          as="span"
+          animation="border"
+          size="sm"
+          role="status"
+          aria-hidden="true"
+        />
+      );
+    } else if (feed.price !== '') {
+      return (<div>{this.removeBaseFactor(feed.price, feed.decimals)} {feed.denom} <small className="text-muted">(Last Oracle Price)</small><Button className="ml-1" variant="link" size="sm" onClick={this.getQuote}><FontAwesomeIcon icon="sync" /></Button></div>);
+    } else {
+      return (<></>);
+    }
+  }
+
   renderFeed() {
     const { feed } = this.state;
     return (
       <Card>
         <Card.Body>
-          <Card.Title>{feed.name}</Card.Title>
+          <Card.Title className="d-flex justify-content-between align-items-start">
+            <div>{feed.name}</div>
+            {this.renderPriceInFeed()}
+          </Card.Title>
           <Card.Text>
             <TradingViewWidget
               symbol={feed.chartSymbol}
@@ -593,8 +656,8 @@ class App extends Component {
         account = accounts[0];
 
       // Check whether conditions met to trade w account
-      if (ethereum.networkVersion !== '3') {
-        alert('This application only works on Ropsten Test Network ... for now');
+      if (ethereum.networkVersion !== '4') {
+        alert('This application only works on Rinkeby Test Network ... for now');
         return;
       } else if (!account) {
         alert('Create a MetaMask account to trade');
@@ -643,7 +706,7 @@ class App extends Component {
       Object.keys(positions).forEach(symbol => {
         const position = positions[symbol],
           feed = feeds[symbol],
-          ret = (feed.lastPrice && position.averagePrice ? Math.max(Math.sign(position.amount) * ((parseFloat(feed.lastPrice) - parseFloat(position.averagePrice)) / parseFloat(position.averagePrice)), -1.00) : 0.0),
+          ret = (feed && feed.lastPrice && position.averagePrice ? Math.max(Math.sign(position.amount) * ((parseFloat(feed.lastPrice) - parseFloat(position.averagePrice)) / parseFloat(position.averagePrice)), -1.00) : 0.0),
           gain = Math.abs(position.amount) * ret;
 
         position.ret = ret;
@@ -663,8 +726,31 @@ class App extends Component {
   }
 
   initializeTotalStats = async () => {
-    const total = (await firebase.firestore().collection("balances").doc('total').get()).data();
+    const { tokenAddress, account } = this.state;
+    // TODO: make sure have eth context
+    // SEE: https://github.com/iearn-finance/iearn-finance/blob/y/src/stores/store.jsx#L1273
+    // TODO: https://web3js.readthedocs.io/en/v1.3.0/getting-started.html
+    const eth = new Eth(window.ethereum);
+    const tokenContract = new eth.Contract(config.dev.ovlTokenABI, tokenAddress);
+
+    const supply = await tokenContract.methods.totalSupply().call();
+    const decimals = await tokenContract.methods.decimals().call();
+    const total = { supply, decimals };
     this.setState({ total });
+  }
+
+  // Initializes the current feed ...
+  initializeFeed = async () => {
+    const { feed, feeds } = this.state;
+    await this.getQuote();
+
+    // TODO: Set up listeners
+    //switch (feed.feedABIType) {
+    //  case 'ovlChainlinkFeedABI':
+    //    break;
+    //  default:
+    //    console.log('feed type not supported for listeners');
+    //}
   }
 
   initializeFeeds = async () => {
@@ -709,17 +795,21 @@ class App extends Component {
 
   initializeListeners = () => {
     this.initializeMetaMaskListeners();
+    // TODO: add token.mint/burn listeners ... for supply changes
   }
 
   componentDidMount = async () => {
     // Initialize Firebase
     firebase.initializeApp(constants.firebase.config);
 
+    // TODO: Initialize web3 provider
+
     // Initialize total metrics: circulating supply, reserve supply of OVL, etc.
     await this.initializeTotalStats();
 
     // Initialize feeds: get last prices
-    await this.initializeFeeds();
+    // await this.initializeFeeds();
+    await this.initializeFeed();
 
     // Initialize listeners for event changes
     this.initializeListeners();
