@@ -12,6 +12,7 @@ import {
   FormControl,
   InputGroup,
   Modal,
+  Nav,
   Navbar,
   Spinner,
   ToggleButtonGroup,
@@ -22,7 +23,6 @@ import TradingViewWidget, { BarStyles } from 'react-tradingview-widget';
 import * as firebase from "firebase/app";
 import "firebase/firestore";
 import "firebase/functions";
-import Numeral from 'numeral';
 import { library } from '@fortawesome/fontawesome-svg-core';
 import { faSync } from '@fortawesome/free-solid-svg-icons';
 import { FontAwesomeIcon } from '@fortawesome/react-fontawesome';
@@ -54,9 +54,9 @@ class App extends Component {
       balance: null,
       tokenAddress: '0x74a653d735f79c1d7c817023c8740465a8be43a6',
       feeds: {
-        'COINBASE-BTCUSD': {
+        'CHAINLINK-BTCUSD': {
           name: 'BTC / USD',
-          symbol: 'COINBASE-BTCUSD',
+          symbol: 'CHAINLINK-BTCUSD',
           chartSymbol: 'COINBASE:BTCUSD',
           price: '',
           decimals: 8,
@@ -66,9 +66,9 @@ class App extends Component {
           marketAddress: '0x999403f37765ee7d5bfb1032e23d8b9241fdac72',
           denom: 'USD',
         },
-        'COINBASE-ETHUSD': {
+        'CHAINLINK-ETHUSD': {
           name: 'ETH / USD',
-          symbol: 'COINBASE-ETHUSD',
+          symbol: 'CHAINLINK-ETHUSD',
           chartSymbol: 'COINBASE:ETHUSD',
           price: '',
           decimals: 8,
@@ -249,9 +249,6 @@ class App extends Component {
       // Update state based on position, balances updates
       this.setState({ positions, balance, total, feeds, amount: '', loadingTrade: false });
 
-      // Update the returns data
-      this.initializeReturns();
-
       // Close the modal
       this.handleClose();
     } catch (err) {
@@ -272,13 +269,12 @@ class App extends Component {
   }
 
   renderBalance() {
-    const { balance, loadingFunds } = this.state;
+    const { balance, loadingFunds, total } = this.state;
     if (balance) {
       return (
-        <small className="text-right px-2">
-          <strong>Unlocked {Numeral(balance.unlocked).format('0,0.000')} OVL</strong>
-          <div>Locked {Numeral(balance.locked).format('0,0.000')} OVL</div>
-        </small>
+        <div className="text-right px-2">
+          <span>Balance: <strong>{this.removeBaseFactor(balance, total.decimals)} OVL</strong></span>
+        </div>
       );
     } else {
       if (loadingFunds) {
@@ -319,7 +315,7 @@ class App extends Component {
     const { total } = this.state;
     return (
       <Navbar bg="light" className="justify-content-center border-bottom">
-        <small>Total Supply: <strong>{(total.supply ? `${Numeral(this.removeBaseFactor(total.supply, total.decimals)).format('0,0.000')} OVL` : '')}</strong></small>
+        <small>Total Supply: <strong>{(total.supply ? `${this.removeBaseFactor(total.supply, total.decimals)} OVL` : '')}</strong></small>
       </Navbar>
     );
   }
@@ -354,7 +350,7 @@ class App extends Component {
     return (
       <Modal id="trade-modal" size="lg" show={this.state.show} onHide={this.handleClose}>
         <Modal.Header closeButton>
-          <strong>Trade {feed.name}</strong>
+          <strong>Build a {feed.name} Position</strong>
         </Modal.Header>
         <Modal.Body>
           <Form>
@@ -364,7 +360,7 @@ class App extends Component {
               height='150'
               widgetType='MiniWidget'
             />
-            <Form.Label className="mt-3">Price</Form.Label>
+            <Form.Label className="mt-3">Price <small className="text-muted">(Last Oracle Price)</small></Form.Label>
             {this.renderPriceInModal()}
             <Form.Label>Side</Form.Label>
             <ButtonToolbar className="mb-3">
@@ -439,9 +435,9 @@ class App extends Component {
 
       return (
         <small className="d-flex justify-content-start mb-2">
-          <div>Locked: <strong>{`${sign}${Numeral(Math.abs(position.amount)).format('0,0.000')}`} OVL</strong></div>
+          <div>Locked: <strong>{`${sign}${Math.abs(position.amount)}`} OVL</strong></div>
           <small className="px-2">&middot;</small>
-          <div>Avg Price: <strong>{(position.averagePrice ? `${Numeral(position.averagePrice).format('0,0.000')} ${feed.denom}` : '-')}</strong></div>
+          <div>Avg Price: <strong>{(position.averagePrice ? `${position.averagePrice} ${feed.denom}` : '-')}</strong></div>
         </small>
       );
     } else {
@@ -517,14 +513,14 @@ class App extends Component {
       } else {
         return (
           <Button variant="primary" type="button" onClick={this.executeTrade}>
-            Submit
+            Build
           </Button>
         );
       }
     } else {
       return (
         <Button variant="primary" type="button" disabled>
-          Submit
+          Build
         </Button>
       );
     }
@@ -574,7 +570,7 @@ class App extends Component {
           <Card.Text>
             <TradingViewWidget
               symbol={feed.chartSymbol}
-              style={BarStyles.AREA}
+              style={BarStyles.CANDLES}
               width='100%'
               height='325'
               allow_symbol_change={false}
@@ -596,10 +592,10 @@ class App extends Component {
         <div className="d-flex justify-content-between align-items-center">
           <small>
             <strong>Your Current Positions</strong>
-            <div>Locked: <strong>{(Math.abs(position.amount) > 0.0 ? (Math.sign(position.amount) === 1 ? 'Long ' : 'Short ') : ' ')}{Numeral(Math.abs(position.amount)).format('0,00.000')} OVL</strong></div>
-            <div>Avg Price: <strong>{(position.averagePrice ? `${Numeral(position.averagePrice).format('0,0.000')} ${feed.denom}` : '-')}</strong></div>
+            <div>Locked: <strong>{(Math.abs(position.amount) > 0.0 ? (Math.sign(position.amount) === 1 ? 'Long ' : 'Short ') : ' ')}{Math.abs(position.amount)} OVL</strong></div>
+            <div>Avg Price: <strong>{(position.averagePrice ? `${position.averagePrice} ${feed.denom}` : '-')}</strong></div>
           </small>
-          <Button variant="primary" size="md" onClick={this.handleShow}>Trade</Button>
+          <Button variant="primary" size="md" onClick={this.handleShow}>Build New Position</Button>
         </div>
       );
     } else {
@@ -611,7 +607,7 @@ class App extends Component {
             <div>Locked: <strong>{(balance ? '0.000 OVL' : '-')}</strong></div>
             <div>Avg Price: <strong>-</strong></div>
           </small>
-          <Button variant="primary" size="md" onClick={this.handleShow}>Trade</Button>
+          <Button variant="primary" size="md" onClick={this.handleShow}>Build New Position</Button>
         </div>
       );
     }
@@ -623,6 +619,7 @@ class App extends Component {
         <div className="fixed-top">
           {this.renderTotalNav()}
           <Navbar bg="light" variant="light" className="justify-content-between border-bottom">
+            <div className="d-flex align-items-center">
             <Navbar.Brand>
               <img
                 src={bannerSrc}
@@ -631,6 +628,12 @@ class App extends Component {
                 alt="React Bootstrap logo"
               />
             </Navbar.Brand>
+            <Nav>
+              <Nav.Link active>Build</Nav.Link>
+              <Nav.Link>Unwind</Nav.Link>
+              <Nav.Link>Liquidate</Nav.Link>
+            </Nav>
+            </div>
             {this.renderAccount()}
           </Navbar>
         </div>
@@ -673,9 +676,14 @@ class App extends Component {
   initializeBalance = async () => {
     // From firebase (but eventually from smart contract)
     // Balance { locked, unlocked }
-    const { account } = this.state;
+    const { account, tokenAddress } = this.state;
+    console.log('account:', account);
     try {
-      var balance = (await firebase.firestore().collection("balances").doc(account).get()).data();
+      const eth = new Eth(window.ethereum);
+      const tokenContract = new eth.Contract(config.dev.ovlTokenABI, tokenAddress);
+      const balance = await tokenContract.methods.balanceOf(account).call();
+      console.log('account', account);
+      console.log('balance', balance);
       if (!balance) {
         balance = null;
       }
@@ -695,34 +703,6 @@ class App extends Component {
     } catch (error) {
       console.error(error);
     }
-  }
-
-  initializeReturns = () => {
-    const { balance, positions, feeds } = this.state;
-
-    if (positions) {
-      // Calculate returns, gains for each given price data
-      var balanceGain = 0.0; // NOTE: use for locked paper gains/losses
-      Object.keys(positions).forEach(symbol => {
-        const position = positions[symbol],
-          feed = feeds[symbol],
-          ret = (feed && feed.lastPrice && position.averagePrice ? Math.max(Math.sign(position.amount) * ((parseFloat(feed.lastPrice) - parseFloat(position.averagePrice)) / parseFloat(position.averagePrice)), -1.00) : 0.0),
-          gain = Math.abs(position.amount) * ret;
-
-        position.ret = ret;
-        position.gain = gain;
-
-        balanceGain += gain;
-      });
-
-      // Calculate total paper gains/return for locked balance funds
-      // NOTE: Math.max(, -1.0) because can't lose more than what you've locked up
-      const balanceRet = Math.max(balanceGain / balance.locked, -1.0);
-      balance.ret = balanceRet;
-      balance.gain = balanceGain;
-    }
-
-    this.setState({ balance, positions });
   }
 
   initializeTotalStats = async () => {
@@ -775,7 +755,6 @@ class App extends Component {
     await this.initializeMetaMask();
     await this.initializeBalance();
     await this.initializePositions();
-    this.initializeReturns();
   }
 
   initializeMetaMaskListeners = () => {
