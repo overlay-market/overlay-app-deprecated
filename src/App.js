@@ -1,6 +1,7 @@
 import React, { Component } from 'react';
 import {
   Accordion,
+  Alert,
   Button,
   ButtonGroup,
   ButtonToolbar,
@@ -15,10 +16,12 @@ import {
   Nav,
   Navbar,
   Spinner,
+  Toast,
   ToggleButtonGroup,
   ToggleButton,
 } from 'react-bootstrap';
 import Eth from 'web3-eth';
+import Utils from 'web3-utils';
 import TradingViewWidget, { BarStyles } from 'react-tradingview-widget';
 import * as firebase from "firebase/app";
 import "firebase/firestore";
@@ -45,11 +48,12 @@ class App extends Component {
     this.submitInviteCode = this.submitInviteCode.bind(this);
     this.addFunds = this.addFunds.bind(this);
     this.getQuote = this.getQuote.bind(this);
-    this.executeTrade = this.executeTrade.bind(this);
+    this.buildPosition = this.buildPosition.bind(this);
 
     this.state = {
       total: {},
       account: null,
+      allowance: 999999999999,
       positions: null,
       balance: null,
       tokenAddress: '0x74a653d735f79c1d7c817023c8740465a8be43a6',
@@ -102,21 +106,21 @@ class App extends Component {
           marketAddress: '',
           denom: 'ETH',
         },
-        'UNISWAP-WETHUSDT': {
-          name: 'ETH / USDT',
-          symbol: 'UNISWAP-WETHUSDT',
-          chartSymbol: 'UNISWAP:WETHUSDT',
+        'UNISWAP-DAIWETH': {
+          name: 'DAI / ETH',
+          symbol: 'UNISWAP-DAIWETH',
+          chartSymbol: 'UNISWAP:DAIWETH',
           price: '',
           decimals: 0,
           feedAddress: '',
           feedABIType: 'ovlUniswapV2FeedABI',
           feedDataSourceAddress: '',
           marketAddress: '',
-          denom: 'USD',
+          denom: 'ETH',
         },
-        'UNISWAP-OVLETH': {
+        'UNISWAP-OVLWETH': {
           name: 'OVL / ETH',
-          symbol: 'UNISWAP-OVLETH',
+          symbol: 'UNISWAP-OVLWETH',
           chartSymbol: 'UNISWAP:OVLWETH',
           price: '',
           decimals: 0,
@@ -141,10 +145,13 @@ class App extends Component {
         denom: 'USD',
       },
       show: false,
+      pendingTxHashes: [],
+      showPendingTx: false,
       loadingPrice: false,
+      loadingApproval: false,
       loadingFunds: false,
       loadingTrade: false,
-      side: 1,
+      side: 1, // either 1 for long or -1 for short
       amount: '',
       leverage: 1,
     };
@@ -160,8 +167,9 @@ class App extends Component {
 
   async handleFeedChange(e) {
     const { feeds } = this.state;
-    await this.setState({ feed: feeds[e.target.value] });
+    await this.setState({ feed: feeds[e.target.value], allowance: 99999999999 });
     await this.initializeFeed();
+    await this.initializeAllowance();
   }
 
   submitInviteCode = async () => {
@@ -210,7 +218,7 @@ class App extends Component {
       const price = await feedContract.methods.getData().call();
 
       // Store price value in feeds and feed of state
-      feeds[feed.symbol].price = feed.price = price
+      feeds[feed.symbol].price = feed.price = price;
       this.setState({ feeds, feed, loadingPrice: false });
     } catch (err) {
       console.error(err);
@@ -219,9 +227,34 @@ class App extends Component {
     }
   }
 
-  executeTrade = async () => {
-    const { feed, feeds, account, amount, side, leverage } = this.state;
+  approveMarket = async () => {
+    const { account, feed, tokenAddress } = this.state;
+    try {
+      // Mark as loading
+      this.setState({ loadingAllowance: true });
 
+      // Fetch price quote from oracle for active feed in modal
+      const eth = new Eth(window.ethereum);
+      const tokenContract = new eth.Contract(config.dev.ovlTokenABI, tokenAddress);
+      const tx = await tokenContract.methods.approve(
+        feed.marketAddress,
+        Utils.toWei('999999999999', "ether"),
+      ).send({ 'from': account }); // TODO: gasPrice ...
+      console.log('tx', tx); // TODO: Handle this event properly! ... it's there in the tx obj, but likely easier to do with on('Approve')?
+
+      // Store allowance
+      const allowance = 0; // get from tx.Approval event value
+      this.setState({ allowance, loadingPrice: false });
+    } catch (err) {
+      console.error(err);
+      this.setState({ loadingAllowance: false });
+      //alert('Not able to get quote at this time');
+    }
+
+  }
+
+  buildPosition = async () => {
+    const { feed, feeds, account, balance, amount, side, leverage, total, allowance } = this.state;
     try {
       if (!amount) {
         throw new Error('Amount of OVL is required');
@@ -232,29 +265,67 @@ class App extends Component {
       // Mark as loading
       this.setState({ loadingTrade: true });
 
-      // Submit trade to update position
-      // { account, symbol, amount, price }
-      const { positions, balance, total } = (
-        await firebase.functions().httpsCallable('updatePosition')({
-          account,
-          amount: parseFloat(amount) * side,
-          price: parseFloat(feed.price),
-          symbol: feed.symbol,
-        })
-      ).data;
+      console.log('amount', amount);
+      console.log('amount type', typeof amount);
+      console.log('balance', balance);
+      const eth = new Eth(window.ethereum);
+      const fPosContract = new eth.Contract(config.dev.ovlFPositionABI, feed.marketAddress);
+      console.log('amount to send', this.applyBaseFactor(parseFloat(amount), total.decimals));
+      console.log('long to send', (side === 1));
+      console.log('leverage to send', this.applyBaseFactor(leverage, total.decimals));
+      const amountToSend = this.applyBaseFactor(parseFloat(amount), total.decimals);
+      if (amountToSend > balance) {
+        throw new Error('Position amount must not be larger than OVL balance'); // TODO: gray out button in this case (on input event)
+      } else if (amountToSend > allowance) {
+        throw new Error('Position amount must not be larger than OVL allowance for market'); // NOTE: this should never happen!
+      }
 
-      // Clear out the oracle price
-      feeds[feed.symbol].price = feed.price = '';
-
-      // Update state based on position, balances updates
-      this.setState({ positions, balance, total, feeds, amount: '', loadingTrade: false });
-
-      // Close the modal
-      this.handleClose();
+      const self = this;
+      const leverageToSend = this.applyBaseFactor(leverage, total.decimals);
+      fPosContract.methods.build(
+        amountToSend.toString(),
+        (side === 1),
+        leverageToSend.toString(),
+      ).send({ 'from': account })
+       .on('transactionHash', (hash) => {
+         // Update state based on position, balances
+         self.addPendingTxHash(hash);
+         self.setState({ amount: '', side: 1, leverage: 1, loadingTrade: false });
+         // Close the modal
+         self.handleClose();
+       })
+       .on('receipt', (receipt) => {
+         console.log('receipt', receipt);
+         console.log('prev balance', balance);
+         console.log('amount sent', amountToSend);
+         const newBalance = balance - amountToSend; // TODO: Set up listener for OVL token burns on total
+         console.log('new balance', newBalance);
+         self.setState({ balance: newBalance });
+       })
+        .on('error', (error) => {
+          console.error(error);
+          // TODO: alert ...
+        });
     } catch (err) {
       console.error(err);
       this.setState({ loadingTrade: false });
       alert(`Error executing trade: ${err.message}`);
+    }
+  }
+
+  getLiquidationPrice = () => {
+    const { feed, balance, leverage, side, amount } = this.state;
+    if (feed.price == '') {
+      return 0;
+    }
+
+    const price = this.removeBaseFactor(feed.price, feed.decimals);
+    if (side === 1) {
+      // long: liquidate = lockPrice * (1-1/leverage); liquidate when pnl = -amount so no debt
+      return price * (1 - 1/leverage);
+    } else {
+      // short: liquidate = lockPrice * (1+1/leverage)
+      return price * (1 + 1/leverage);
     }
   }
 
@@ -324,7 +395,7 @@ class App extends Component {
     const { account, balance } = this.state;
     if (account) {
       return (
-        <div className="d-flex align-items-center">
+        <div className="d-flex align-items-center justify-content-end">
           {this.renderBalance()}
           <Button variant="light">
             {`${account.substring(0, 6)}...${account.substring(account.length - 4)}`}
@@ -360,7 +431,7 @@ class App extends Component {
               height='150'
               widgetType='MiniWidget'
             />
-            <Form.Label className="mt-3">Price <small className="text-muted">(Last Oracle Price)</small></Form.Label>
+            <Form.Label className="mt-3">Price <small className="text-muted">(Last Oracle Price: 8h TWAP)</small></Form.Label>
             {this.renderPriceInModal()}
             <Form.Label>Side</Form.Label>
             <ButtonToolbar className="mb-3">
@@ -389,7 +460,7 @@ class App extends Component {
                 <InputGroup.Text id="btnGroupAddon">OVL</InputGroup.Text>
               </InputGroup.Append>
             </InputGroup>
-            <Form.Label>Leverage: {leverage}x</Form.Label>
+            <Form.Label>Leverage: {leverage}x <small className="text-muted">(Liquidation Price Est.: {this.getLiquidationPrice()} {feed.denom})</small></Form.Label>
             <InputGroup>
               <Form.Control
                 id="trade-leverage"
@@ -404,10 +475,9 @@ class App extends Component {
             </InputGroup>
           </Form>
         </Modal.Body>
-        <Modal.Footer className="d-flex justify-content-between align-items-start">
+        <Modal.Footer className="d-flex justify-content-between align-items-center">
           <div className="d-flex flex-column">
             <small>Fee: <strong>0.15%</strong></small>
-            <small>Max payout: <strong>1% of total supply</strong></small>
           </div>
           {this.renderModalButton()}
         </Modal.Footer>
@@ -512,7 +582,7 @@ class App extends Component {
         );
       } else {
         return (
-          <Button variant="primary" type="button" onClick={this.executeTrade}>
+          <Button variant="primary" type="button" onClick={this.buildPosition}>
             Build
           </Button>
         );
@@ -524,6 +594,40 @@ class App extends Component {
         </Button>
       );
     }
+  }
+
+  addPendingTxHash(hash) {
+    const { pendingTxHashes } = this.state;
+    pendingTxHashes.push(hash);
+    this.setState({ pendingTxHashes, showPendingTx: true });
+  }
+
+  removePendingTxHash(hash) {
+    var { pendingTxHashes } = this.state;
+    const i = pendingTxHashes.indexOf(hash);
+    if (i > -1) {
+      pendingTxHashes = pendingTxHashes.splice(i, 1);
+      this.setState({ pendingTxHashes, showPendingTx: false });
+      console.log('pendingTxHashes', this.state.pendingTxHashes);
+    }
+  }
+
+  renderToasts() {
+    const { pendingTxHashes, showPendingTx } = this.state;
+    const hash = pendingTxHashes[pendingTxHashes.length-1];
+    if (!hash) {
+      return (<></>);
+    }
+    return (
+      <Navbar fixed="bottom">
+        <Toast show={showPendingTx} onClose={() => this.removePendingTxHash(hash)}>
+          <Toast.Header>
+            <strong className="mr-auto">Submitted</strong>
+          </Toast.Header>
+          <Toast.Body><strong>Tx Hash:</strong> <a href={`https://rinkeby.etherscan.io/tx/${hash}`} target="_blank">{`${hash.substring(0, 8)}...${hash.substring(hash.length-8, hash.length)}`}</a></Toast.Body>
+        </Toast>
+      </Navbar>
+    );
   }
 
   renderSelectFeed() {
@@ -552,7 +656,7 @@ class App extends Component {
         />
       );
     } else if (feed.price !== '') {
-      return (<div>{this.removeBaseFactor(feed.price, feed.decimals)} {feed.denom} <small className="text-muted">(Last Oracle Price)</small><Button className="ml-1" variant="link" size="sm" onClick={this.getQuote}><FontAwesomeIcon icon="sync" /></Button></div>);
+      return (<div>{this.removeBaseFactor(feed.price, feed.decimals)} {feed.denom} <small className="text-muted"><small>(Last Oracle Price)</small></small><Button className="ml-1" variant="link" size="sm" onClick={this.getQuote}><FontAwesomeIcon icon="sync" /></Button></div>);
     } else {
       return (<></>);
     }
@@ -583,8 +687,32 @@ class App extends Component {
     );
   }
 
+  renderBuildPositionButton() {
+    const { account, allowance, feed, loadingApproval } = this.state;
+    if (allowance > 0 || !account) {
+      return (<Button variant="primary" size="md" type="button" onClick={this.handleShow} disabled={( account === null )}>Build New Position</Button>);
+    } else {
+      if (loadingApproval) {
+        return (
+          <Button variant="outline-primary" size="md" type="button">
+            <Spinner
+              as="span"
+              animation="border"
+              size="sm"
+              role="status"
+              aria-hidden="true"
+            />
+            <span className="sr-only">Loading...</span>
+          </Button>
+        );
+      } else {
+        return (<Button variant="outline-primary" size="md" onClick={this.approveMarket} type="button">Approve {feed.name}</Button>);
+      }
+    }
+  }
+
   renderPositionInFeed() {
-    const { positions, feed, balance } = this.state;
+    const { positions, feed, balance, account } = this.state;
     const symbol = feed.symbol;
     if (positions && symbol in positions) {
       const position = positions[symbol];
@@ -595,7 +723,7 @@ class App extends Component {
             <div>Locked: <strong>{(Math.abs(position.amount) > 0.0 ? (Math.sign(position.amount) === 1 ? 'Long ' : 'Short ') : ' ')}{Math.abs(position.amount)} OVL</strong></div>
             <div>Avg Price: <strong>{(position.averagePrice ? `${position.averagePrice} ${feed.denom}` : '-')}</strong></div>
           </small>
-          <Button variant="primary" size="md" onClick={this.handleShow}>Build New Position</Button>
+          {this.renderBuildPositionButton()}
         </div>
       );
     } else {
@@ -607,7 +735,7 @@ class App extends Component {
             <div>Locked: <strong>{(balance ? '0.000 OVL' : '-')}</strong></div>
             <div>Avg Price: <strong>-</strong></div>
           </small>
-          <Button variant="primary" size="md" onClick={this.handleShow}>Build New Position</Button>
+          {this.renderBuildPositionButton()}
         </div>
       );
     }
@@ -618,29 +746,32 @@ class App extends Component {
       <Container>
         <div className="fixed-top">
           {this.renderTotalNav()}
-          <Navbar bg="light" variant="light" className="justify-content-between border-bottom">
-            <div className="d-flex align-items-center">
-            <Navbar.Brand>
-              <img
-                src={bannerSrc}
-                height="35"
-                className="d-inline-block align-top"
-                alt="React Bootstrap logo"
-              />
-            </Navbar.Brand>
-            <Nav>
+          <Navbar bg="light" variant="light" className="border-bottom">
+          <Navbar.Brand>
+            <img
+              src={bannerSrc}
+              height="35"
+              className="d-inline-block align-top"
+            alt="React Bootstrap logo"
+          />
+          </Navbar.Brand>
+          <Navbar.Collapse>
+            <Nav className="mr-auto">
               <Nav.Link active>Build</Nav.Link>
               <Nav.Link>Unwind</Nav.Link>
               <Nav.Link>Liquidate</Nav.Link>
+              <Nav.Link>Stake</Nav.Link>
+              <Nav.Link>Govern</Nav.Link>
             </Nav>
-            </div>
-            {this.renderAccount()}
+          </Navbar.Collapse>
+          {this.renderAccount()}
           </Navbar>
         </div>
         {this.renderModal()}
         <Container className="App">
           {this.renderSelectFeed()}
           {this.renderFeed()}
+          {this.renderToasts()}
         </Container>
       </Container>
     );
@@ -654,9 +785,9 @@ class App extends Component {
     }
 
     try {
-      const ethereum = window.ethereum,
-        accounts = await ethereum.enable(),
-        account = accounts[0];
+      const ethereum = window.ethereum;
+      const accounts = await ethereum.request({ method: 'eth_requestAccounts' });
+      const account = accounts[0];
 
       // Check whether conditions met to trade w account
       if (ethereum.networkVersion !== '4') {
@@ -705,6 +836,29 @@ class App extends Component {
     }
   }
 
+  initializeAllowance = async () => {
+    const { account, feed, tokenAddress } = this.state;
+    if (account === null) {
+      return;
+    }
+
+    try {
+      // Mark as loading
+      this.setState({ loadingAllowance: true });
+
+      // Fetch price quote from oracle for active feed in modal
+      const eth = new Eth(window.ethereum);
+      const tokenContract = new eth.Contract(config.dev.ovlTokenABI, tokenAddress);
+      const allowance = await tokenContract.methods.allowance(account, feed.marketAddress).call();
+      console.log('allowance:', allowance);
+
+      // Store allowance amount
+      this.setState({ allowance: allowance, loadingAllowance: false });
+    } catch (err) {
+      console.error(err);
+    }
+  }
+
   initializeTotalStats = async () => {
     const { tokenAddress, account } = this.state;
     // TODO: make sure have eth context
@@ -717,6 +871,25 @@ class App extends Component {
     const decimals = await tokenContract.methods.decimals().call();
     const total = { supply, decimals };
     this.setState({ total });
+
+    // Set up listeners for mint/burn events
+    const self = this;
+    tokenContract.events.Transfer()
+     .on('data', (event) => {
+       if (event.returnValues.from === "0x0000000000000000000000000000000000000000") {
+         // mint
+         console.log('previous supply', supply);
+         const newSupply = supply + parseFloat(event.returnValues.value);
+         self.setState({ total: { supply: newSupply, decimals: decimals } });
+         console.log('new supply', newSupply);
+       } else if (event.returnValues.to === "0x0000000000000000000000000000000000000000") {
+         // burn
+         console.log('previous supply', supply);
+         const newSupply = supply - parseFloat(event.returnValues.value);
+         self.setState({ total: { supply: newSupply, decimals: decimals } });
+         console.log('new supply', newSupply);
+       }
+     });
   }
 
   // Initializes the current feed ...
@@ -755,6 +928,7 @@ class App extends Component {
     await this.initializeMetaMask();
     await this.initializeBalance();
     await this.initializePositions();
+    await this.initializeAllowance();
   }
 
   initializeMetaMaskListeners = () => {
