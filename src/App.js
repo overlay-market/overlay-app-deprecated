@@ -760,8 +760,6 @@ class App extends Component {
               <Nav.Link active>Build</Nav.Link>
               <Nav.Link>Unwind</Nav.Link>
               <Nav.Link>Liquidate</Nav.Link>
-              <Nav.Link>Stake</Nav.Link>
-              <Nav.Link>Govern</Nav.Link>
             </Nav>
           </Navbar.Collapse>
           {this.renderAccount()}
