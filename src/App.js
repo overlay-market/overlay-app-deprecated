@@ -59,7 +59,7 @@ class App extends Component {
     this.state = {
       total: {},
       account: null,
-      allowance: 999999999999,
+      allowance: 999999999999*1e18,
       positions: null,
       balance: null,
       tokenAddress: '0x1c8D468bFdc4D7c153e34811de191AD08A33a278',
@@ -222,7 +222,7 @@ class App extends Component {
 
   async handleFeedChange(e) {
     const { feeds } = this.state;
-    await this.setState({ feed: feeds[e.target.value], allowance: 99999999999 });
+    await this.setState({ feed: feeds[e.target.value], allowance: 99999999999*1e18 });
     await this.initializeFeed();
     await this.initializeAllowance();
   }
@@ -360,7 +360,7 @@ class App extends Component {
       ).send({ 'from': account }); // TODO: gasPrice ...
 
       // Store allowance
-      const allowance = 999999999999; // get from tx.Approval event value
+      const allowance = 999999999999*1e18; // get from tx.Approval event value
       this.setState({ allowance, loadingPrice: false });
     } catch (err) {
       console.error(err);
