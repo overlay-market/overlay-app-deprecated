@@ -23,6 +23,7 @@ import {
 import Eth from 'web3-eth';
 import Utils from 'web3-utils';
 import TradingViewWidget, { BarStyles } from 'react-tradingview-widget';
+import numeral from 'numeral';
 import * as firebase from "firebase/app";
 import "firebase/firestore";
 import "firebase/functions";
@@ -56,18 +57,19 @@ class App extends Component {
       allowance: 999999999999,
       positions: null,
       balance: null,
-      tokenAddress: '0x74a653d735f79c1d7c817023c8740465a8be43a6',
+      tokenAddress: '0xF32F01B23d0049a87F0c2EB293764b01c18e4fD0',
       feeds: {
         'CHAINLINK-BTCUSD': {
           name: 'BTC / USD',
           symbol: 'CHAINLINK-BTCUSD',
           chartSymbol: 'COINBASE:BTCUSD',
           price: '',
+          period: '',
           decimals: 8,
-          feedAddress: '0x8024a34755eE778387049738E6f8d8DB634C33aA',
+          feedAddress: '0xe52D0916d5747E76720cb77D1153800898703eCd',
           feedABIType: 'ovlChainlinkFeedABI',
           feedDataSourceAddress: '0xECe365B379E1dD183B20fc5f022230C044d51404',
-          marketAddress: '0x999403f37765ee7d5bfb1032e23d8b9241fdac72',
+          marketAddress: '0xb1d96D634B1C00744B527440635e648E7D7eF54a',
           denom: 'USD',
         },
         'CHAINLINK-ETHUSD': {
@@ -75,11 +77,25 @@ class App extends Component {
           symbol: 'CHAINLINK-ETHUSD',
           chartSymbol: 'COINBASE:ETHUSD',
           price: '',
+          period: '',
           decimals: 8,
-          feedAddress: '',
+          feedAddress: '0x10e3180786f5D648CE762969c0ee12F48A19D8dc',
           feedABIType: 'ovlChainlinkFeedABI',
-          feedDataSourceAddress: '',
-          marketAddress: '',
+          feedDataSourceAddress: '0x8A753747A1Fa494EC906cE90E9f37563A8AF630e',
+          marketAddress: '0x3E1AFE6D7e30b55D086C107a82661C58Db1510a1',
+          denom: 'USD',
+        },
+        'CHAINLINK-DAIUSD': {
+          name: 'DAI / USD',
+          symbol: 'CHAINLINK-DAIUSD',
+          chartSymbol: 'COINBASE:DAIUSD',
+          price: '',
+          period: '',
+          decimals: 8,
+          feedAddress: '0x8E6269f15367bEc98Cdd98D8914CA5D27498f6e7',
+          feedABIType: 'ovlChainlinkFeedABI',
+          feedDataSourceAddress: '0x2bA49Aaa16E6afD2a993473cfB70Fa8559B523cF',
+          marketAddress: '0x2A598B2f7B47CB4B37577416D690e95b4648baE6',
           denom: 'USD',
         },
         'CHAINLINK-FASTGAS': {
@@ -87,7 +103,8 @@ class App extends Component {
           symbol: 'CHAINLINK-FASTGAS',
           chartSymbol: 'CHAINLINK:FASTGAS',
           price: '',
-          decimals: 8,
+          period: '',
+          decimals: 0,
           feedAddress: '',
           feedABIType: 'ovlChainlinkFeedABI',
           feedDataSourceAddress: '',
@@ -99,6 +116,7 @@ class App extends Component {
           symbol: 'UNISWAP-WBTCWETH',
           chartSymbol: 'UNISWAP:WBTCWETH',
           price: '',
+          period: '',
           decimals: 0,
           feedAddress: '',
           feedABIType: 'ovlUniswapV2FeedABI',
@@ -111,6 +129,7 @@ class App extends Component {
           symbol: 'UNISWAP-DAIWETH',
           chartSymbol: 'UNISWAP:DAIWETH',
           price: '',
+          period: '',
           decimals: 0,
           feedAddress: '',
           feedABIType: 'ovlUniswapV2FeedABI',
@@ -123,6 +142,7 @@ class App extends Component {
           symbol: 'UNISWAP-OVLWETH',
           chartSymbol: 'UNISWAP:OVLWETH',
           price: '',
+          period: '',
           decimals: 0,
           feedAddress: '',
           feedABIType: 'ovlUniswapV2FeedABI',
@@ -134,14 +154,15 @@ class App extends Component {
       inviteCode: '',
       feed: {
         name: 'BTC / USD',
-        symbol: 'COINBASE-BTCUSD',
+        symbol: 'CHAINLINK-BTCUSD',
         chartSymbol: 'COINBASE:BTCUSD',
         price: '',
+        period: '',
         decimals: 8,
-        feedAddress: '0x8024a34755eE778387049738E6f8d8DB634C33aA',
+        feedAddress: '0xe52D0916d5747E76720cb77D1153800898703eCd',
         feedABIType: 'ovlChainlinkFeedABI',
         feedDataSourceAddress: '0xECe365B379E1dD183B20fc5f022230C044d51404',
-        marketAddress: '0x999403f37765ee7d5bfb1032e23d8b9241fdac72',
+        marketAddress: '0xb1d96D634B1C00744B527440635e648E7D7eF54a',
         denom: 'USD',
       },
       show: false,
@@ -215,10 +236,15 @@ class App extends Component {
       // Fetch price quote from oracle for active feed in modal
       const eth = new Eth(window.ethereum);
       const feedContract = new eth.Contract(config.dev[feed.feedABIType], feed.feedAddress);
-      const price = await feedContract.methods.getData().call();
+      const obj = await feedContract.methods.data().call();
+      const price = obj[0];
+      const period = obj[1];
+      console.log('price:', price);
+      console.log('period:', period);
 
       // Store price value in feeds and feed of state
       feeds[feed.symbol].price = feed.price = price;
+      feeds[feed.symbol].period = feed.period = period;
       this.setState({ feeds, feed, loadingPrice: false });
     } catch (err) {
       console.error(err);
@@ -240,10 +266,9 @@ class App extends Component {
         feed.marketAddress,
         Utils.toWei('999999999999', "ether"),
       ).send({ 'from': account }); // TODO: gasPrice ...
-      console.log('tx', tx); // TODO: Handle this event properly! ... it's there in the tx obj, but likely easier to do with on('Approve')?
 
       // Store allowance
-      const allowance = 0; // get from tx.Approval event value
+      const allowance = 999999999999; // get from tx.Approval event value
       this.setState({ allowance, loadingPrice: false });
     } catch (err) {
       console.error(err);
@@ -431,7 +456,7 @@ class App extends Component {
               height='150'
               widgetType='MiniWidget'
             />
-            <Form.Label className="mt-3">Price <small className="text-muted">(Last Oracle Price: 8h TWAP)</small></Form.Label>
+            <Form.Label className="mt-3">Price <small className="text-muted">(Last Oracle Price: {numeral(feed.period/(3600.0)).format('0,00.0')}h TWAP)</small></Form.Label>
             {this.renderPriceInModal()}
             <Form.Label>Side</Form.Label>
             <ButtonToolbar className="mb-3">
@@ -656,7 +681,7 @@ class App extends Component {
         />
       );
     } else if (feed.price !== '') {
-      return (<div>{this.removeBaseFactor(feed.price, feed.decimals)} {feed.denom} <small className="text-muted"><small>(Last Oracle Price)</small></small><Button className="ml-1" variant="link" size="sm" onClick={this.getQuote}><FontAwesomeIcon icon="sync" /></Button></div>);
+      return (<div>{this.removeBaseFactor(feed.price, feed.decimals)} {feed.denom} <small className="text-muted"><small>({numeral(feed.period/(3600.0)).format('0,00.0')}h TWAP)</small></small><Button className="ml-1" variant="link" size="sm" onClick={this.getQuote}><FontAwesomeIcon icon="sync" /></Button></div>);
     } else {
       return (<></>);
     }
