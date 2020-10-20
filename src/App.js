@@ -6,15 +6,18 @@ import {
   ButtonGroup,
   ButtonToolbar,
   Card,
+  Col,
   Container,
   Dropdown,
   DropdownButton,
   Form,
   FormControl,
   InputGroup,
+  ListGroup,
   Modal,
   Nav,
   Navbar,
+  Row,
   Spinner,
   Toast,
   ToggleButtonGroup,
@@ -49,6 +52,8 @@ class App extends Component {
     this.submitInviteCode = this.submitInviteCode.bind(this);
     this.addFunds = this.addFunds.bind(this);
     this.getQuote = this.getQuote.bind(this);
+    this.getOpenPositions = this.getOpenPositions.bind(this);
+    this.getLiquidatablePositions = this.getLiquidatablePositions.bind(this);
     this.buildPosition = this.buildPosition.bind(this);
 
     this.state = {
@@ -57,7 +62,10 @@ class App extends Component {
       allowance: 999999999999,
       positions: null,
       balance: null,
-      tokenAddress: '0xF32F01B23d0049a87F0c2EB293764b01c18e4fD0',
+      tokenAddress: '0x1c8D468bFdc4D7c153e34811de191AD08A33a278',
+      claimAddress: '0xd9d75715bbeeA371357642e0aFbd6DC4113A6B8E',
+      hasClaimed: false,
+      amountToClaim: 0,
       feeds: {
         'CHAINLINK-BTCUSD': {
           name: 'BTC / USD',
@@ -65,12 +73,15 @@ class App extends Component {
           chartSymbol: 'COINBASE:BTCUSD',
           price: '',
           period: '',
+          rounds: 8,
           decimals: 8,
-          feedAddress: '0xe52D0916d5747E76720cb77D1153800898703eCd',
+          feedAddress: '0x3aaAdBE9A830c54245F74E6E578ecA81482ec970',
           feedABIType: 'ovlChainlinkFeedABI',
           feedDataSourceAddress: '0xECe365B379E1dD183B20fc5f022230C044d51404',
-          marketAddress: '0xb1d96D634B1C00744B527440635e648E7D7eF54a',
+          marketAddress: '0xec0d838f6A6ad46EF29D56EFeE39C7ce4CfA8B95',
           denom: 'USD',
+          open: [],
+          liquidatable: [],
         },
         'CHAINLINK-ETHUSD': {
           name: 'ETH / USD',
@@ -78,12 +89,15 @@ class App extends Component {
           chartSymbol: 'COINBASE:ETHUSD',
           price: '',
           period: '',
+          rounds: 8,
           decimals: 8,
-          feedAddress: '0x10e3180786f5D648CE762969c0ee12F48A19D8dc',
+          feedAddress: '0x131D62b8D89712F0927d080f2afdbed289c477dB',
           feedABIType: 'ovlChainlinkFeedABI',
           feedDataSourceAddress: '0x8A753747A1Fa494EC906cE90E9f37563A8AF630e',
-          marketAddress: '0x3E1AFE6D7e30b55D086C107a82661C58Db1510a1',
+          marketAddress: '0xAc0BbA891576640d12019cD6449c3DFbF74683eA',
           denom: 'USD',
+          open: [],
+          liquidatable: [],
         },
         'CHAINLINK-DAIUSD': {
           name: 'DAI / USD',
@@ -91,12 +105,15 @@ class App extends Component {
           chartSymbol: 'COINBASE:DAIUSD',
           price: '',
           period: '',
+          rounds: 8,
           decimals: 8,
-          feedAddress: '0x8E6269f15367bEc98Cdd98D8914CA5D27498f6e7',
+          feedAddress: '0xF94284d95946229F16d3CB1a61ad47Ae02757cfe',
           feedABIType: 'ovlChainlinkFeedABI',
           feedDataSourceAddress: '0x2bA49Aaa16E6afD2a993473cfB70Fa8559B523cF',
-          marketAddress: '0x2A598B2f7B47CB4B37577416D690e95b4648baE6',
+          marketAddress: '0xf73AEa5eBBcaED32e505044981C16A625043c376',
           denom: 'USD',
+          open: [],
+          liquidatable: [],
         },
         'CHAINLINK-FASTGAS': {
           name: 'Fast Gas / Gwei',
@@ -104,12 +121,15 @@ class App extends Component {
           chartSymbol: 'CHAINLINK:FASTGAS',
           price: '',
           period: '',
+          rounds: 8,
           decimals: 0,
           feedAddress: '',
           feedABIType: 'ovlChainlinkFeedABI',
           feedDataSourceAddress: '',
           marketAddress: '',
           denom: 'ETH',
+          open: [],
+          liquidatable: [],
         },
         'UNISWAP-WBTCWETH': {
           name: 'Wrapped BTC / ETH',
@@ -117,12 +137,15 @@ class App extends Component {
           chartSymbol: 'UNISWAP:WBTCWETH',
           price: '',
           period: '',
+          rounds: 8,
           decimals: 0,
           feedAddress: '',
           feedABIType: 'ovlUniswapV2FeedABI',
           feedDataSourceAddress: '',
           marketAddress: '',
           denom: 'ETH',
+          open: [],
+          liquidatable: [],
         },
         'UNISWAP-DAIWETH': {
           name: 'DAI / ETH',
@@ -130,12 +153,15 @@ class App extends Component {
           chartSymbol: 'UNISWAP:DAIWETH',
           price: '',
           period: '',
+          rounds: 8,
           decimals: 0,
           feedAddress: '',
           feedABIType: 'ovlUniswapV2FeedABI',
           feedDataSourceAddress: '',
           marketAddress: '',
           denom: 'ETH',
+          open: [],
+          liquidatable: [],
         },
         'UNISWAP-OVLWETH': {
           name: 'OVL / ETH',
@@ -143,12 +169,15 @@ class App extends Component {
           chartSymbol: 'UNISWAP:OVLWETH',
           price: '',
           period: '',
+          rounds: 8,
           decimals: 0,
           feedAddress: '',
           feedABIType: 'ovlUniswapV2FeedABI',
           feedDataSourceAddress: '',
           marketAddress: '',
           denom: 'ETH',
+          open: [],
+          liquidatable: [],
         }
       },
       inviteCode: '',
@@ -158,22 +187,27 @@ class App extends Component {
         chartSymbol: 'COINBASE:BTCUSD',
         price: '',
         period: '',
+        rounds: 8,
         decimals: 8,
-        feedAddress: '0xe52D0916d5747E76720cb77D1153800898703eCd',
+        feedAddress: '0x3aaAdBE9A830c54245F74E6E578ecA81482ec970',
         feedABIType: 'ovlChainlinkFeedABI',
         feedDataSourceAddress: '0xECe365B379E1dD183B20fc5f022230C044d51404',
-        marketAddress: '0xb1d96D634B1C00744B527440635e648E7D7eF54a',
+        marketAddress: '0xec0d838f6A6ad46EF29D56EFeE39C7ce4CfA8B95',
         denom: 'USD',
+        open: [],
+        liquidatable: [],
       },
       show: false,
       pendingTxHashes: [],
       showPendingTx: false,
       loadingPrice: false,
+      loadingPositions: false,
       loadingApproval: false,
       loadingFunds: false,
       loadingTrade: false,
       side: 1, // either 1 for long or -1 for short
       amount: '',
+      view: 'build',
       leverage: 1,
     };
   }
@@ -209,17 +243,37 @@ class App extends Component {
   }
 
   addFunds = async () => {
-    const { account } = this.state;
+    const { account, amountToClaim, balance, claimAddress, tokenAddress } = this.state;
     try {
       // Mark as loading
       this.setState({ loadingFunds: true });
 
       // Fund a new account w OVL
-      var balance = (await firebase.functions().httpsCallable('fundAccount')({ account })).data;
-      this.setState({ balance, loadingFunds: false });
+      const eth = new Eth(window.ethereum);
+      const claimContract = new eth.Contract(config.dev.ovlClaimABI, claimAddress);
+      const self = this;
+      claimContract.methods.withdraw()
+       .send({ 'from': account })
+       .on('transactionHash', (hash) => {
+         // Update state based on position, balances
+         self.addPendingTxHash(hash);
+         self.setState({ hasClaimed: true, loadingFunds: false });
+       })
+       .on('receipt', (receipt) => {
+         console.log('receipt', receipt);
+         console.log('prev balance', balance);
+         console.log('claims withdrawn', amountToClaim); // TODO: Fix balance being off after claim!
+         const newBalance = balance + amountToClaim; // TODO: Set up listener for OVL token burns on total
+         console.log('new balance', newBalance);
+         self.setState({ balance: newBalance });
+       })
+        .on('error', (error) => {
+          console.error(error);
+          // TODO: alert ...
+        });
 
-      // Refresh the total stats
-      await this.initializeTotalStats();
+      // var balance = (await firebase.functions().httpsCallable('fundAccount')({ account })).data;
+      this.setState({ balance, loadingFunds: false });
     } catch (err) {
       console.error(err);
       this.setState({ loadingFunds: false });
@@ -253,6 +307,44 @@ class App extends Component {
     }
   }
 
+  getOpenPositions = async () => {
+    const { feeds, feed } = this.state;
+    try {
+      // Mark as loading
+      this.setState({ loadingPositions: true });
+
+      // Fetch open positions for market
+      const eth = new Eth(window.ethereum);
+      const fPosContract = new eth.Contract(config.dev.ovlFPositionABI, feed.marketAddress);
+      const op = await fPosContract.methods.open().call();
+
+      feeds[feed.symbol].open = feed.open = op;
+      this.setState({ feeds, feed, loadingPositions: false });
+    } catch (err) {
+      console.error(err);
+      this.setState({ loadingPositions: false });
+    }
+  }
+
+  getLiquidatablePositions = async () => {
+    const { feeds, feed } = this.state;
+    try {
+      // Mark as loading
+      this.setState({ loadingPositions: true });
+
+      // Fetch open positions for market
+      const eth = new Eth(window.ethereum);
+      const fPosContract = new eth.Contract(config.dev.ovlFPositionABI, feed.marketAddress);
+      const liq = await fPosContract.methods.liquidatable().call();
+
+      feeds[feed.symbol].liquidatable = feed.liquidatable = liq;
+      this.setState({ feeds, feed, loadingPositions: false });
+    } catch (err) {
+      console.error(err);
+      this.setState({ loadingPositions: false });
+    }
+  }
+
   approveMarket = async () => {
     const { account, feed, tokenAddress } = this.state;
     try {
@@ -273,9 +365,7 @@ class App extends Component {
     } catch (err) {
       console.error(err);
       this.setState({ loadingAllowance: false });
-      //alert('Not able to get quote at this time');
     }
-
   }
 
   buildPosition = async () => {
@@ -364,9 +454,48 @@ class App extends Component {
     return amount / base;
   }
 
+  renderClaim() {
+    const { hasClaimed, loadingFunds } = this.state;
+    if (hasClaimed) {
+      return (<></>);
+    }
+
+    if (loadingFunds) {
+      return (
+        <Button
+          variant="secondary"
+          className="mx-2"
+          size="sm"
+          type="button"
+        >
+          <Spinner
+            as="span"
+            animation="border"
+            size="sm"
+            role="status"
+            aria-hidden="true"
+          />
+          <span className="sr-only">Loading...</span>
+        </Button>
+      );
+    } else {
+      return (
+        <Button
+          variant="secondary"
+          className="mx-2"
+          size="sm"
+          type="button"
+          onClick={this.addFunds}
+        >
+          Add Funds
+        </Button>
+      );
+    }
+  }
+
   renderBalance() {
     const { balance, loadingFunds, total } = this.state;
-    if (balance) {
+    if (balance !== 0) {
       return (
         <div className="text-right px-2">
           <span>Balance: <strong>{this.removeBaseFactor(balance, total.decimals)} OVL</strong></span>
@@ -421,6 +550,7 @@ class App extends Component {
     if (account) {
       return (
         <div className="d-flex align-items-center justify-content-end">
+          {this.renderClaim()}
           {this.renderBalance()}
           <Button variant="light">
             {`${account.substring(0, 6)}...${account.substring(account.length - 4)}`}
@@ -456,7 +586,7 @@ class App extends Component {
               height='150'
               widgetType='MiniWidget'
             />
-            <Form.Label className="mt-3">Price <small className="text-muted">(Last Oracle Price: {numeral(feed.period/(3600.0)).format('0,00.0')}h TWAP)</small></Form.Label>
+            <Form.Label className="mt-3">Price <small className="text-muted">(Last Oracle Price: {numeral(feed.period/(3600.0)).format('0,00.0')}h TWAP; {numeral(feed.period/(3600.0*feed.rounds)).format('0,00.0')}h Sampling Period)</small></Form.Label>
             {this.renderPriceInModal()}
             <Form.Label>Side</Form.Label>
             <ButtonToolbar className="mb-3">
@@ -644,7 +774,7 @@ class App extends Component {
       return (<></>);
     }
     return (
-      <Navbar fixed="bottom">
+      <Navbar fixed="bottom" className="d-flex justify-content-center">
         <Toast show={showPendingTx} onClose={() => this.removePendingTxHash(hash)}>
           <Toast.Header>
             <strong className="mr-auto">Submitted</strong>
@@ -685,31 +815,6 @@ class App extends Component {
     } else {
       return (<></>);
     }
-  }
-
-  renderFeed() {
-    const { feed } = this.state;
-    return (
-      <Card>
-        <Card.Body>
-          <Card.Title className="d-flex justify-content-between align-items-start">
-            <div>{feed.name}</div>
-            {this.renderPriceInFeed()}
-          </Card.Title>
-          <Card.Text>
-            <TradingViewWidget
-              symbol={feed.chartSymbol}
-              style={BarStyles.CANDLES}
-              width='100%'
-              height='325'
-              allow_symbol_change={false}
-              show_popup_button
-            />
-          </Card.Text>
-          {this.renderPositionInFeed(feed.symbol)}
-        </Card.Body>
-      </Card>
-    );
   }
 
   renderBuildPositionButton() {
@@ -766,7 +871,160 @@ class App extends Component {
     }
   }
 
+  renderBuild() {
+    const { feed } = this.state;
+    return (
+      <Card>
+        <Card.Body>
+          <Card.Title className="d-flex justify-content-between align-items-start">
+            <div>{feed.name}</div>
+            {this.renderPriceInFeed()}
+          </Card.Title>
+          <Card.Text>
+            <TradingViewWidget
+              symbol={feed.chartSymbol}
+              style={BarStyles.CANDLES}
+              width='100%'
+              height='325'
+              allow_symbol_change={false}
+              show_popup_button
+            />
+          </Card.Text>
+          {this.renderPositionInFeed(feed.symbol)}
+        </Card.Body>
+      </Card>
+    );
+  }
+
+  renderUnwind() {
+    return (
+      <div className="pb-5">
+        <hr/>
+        <h5 className="my-2">Your Positions</h5>
+        <div className="d-flex flex-wrap justify-content-around">
+        <Card className="m-2" style={{ width: '18rem' }}>
+          <Card.Body>
+            <Card.Title>Long BTC / USD</Card.Title>
+            <Card.Subtitle>@ 11200.01239 USD</Card.Subtitle>
+            <Card.Text className="pt-3 pb-2">
+              <div>Amount: <strong>18.9 OVL</strong></div>
+              <div>Leverage: <strong>1.25x</strong></div>
+              <div>PnL: <strong className="text-success">12.78 OVL (+66%)</strong></div>
+            </Card.Text>
+          </Card.Body>
+          <Card.Footer>
+            <Button variant="primary" size="sm">Unwind Position</Button>
+          </Card.Footer>
+        </Card>
+        <Card className="m-2" style={{ width: '18rem' }}>
+          <Card.Body>
+            <Card.Title>Short BTC / USD</Card.Title>
+            <Card.Subtitle>@ 11200.01239 USD</Card.Subtitle>
+            <Card.Text className="pt-3 pb-2">
+              <div>Amount: <strong>18.9 OVL</strong></div>
+              <div>Leverage: <strong>1.25x</strong></div>
+              <div>PnL: <strong className="text-danger">-12.78 OVL (-66%)</strong></div>
+            </Card.Text>
+          </Card.Body>
+          <Card.Footer>
+            <Button variant="primary" size="sm">Unwind Position</Button>
+          </Card.Footer>
+        </Card>
+        <Card className="m-2" style={{ width: '18rem' }}>
+          <Card.Body>
+            <Card.Title>Short BTC / USD</Card.Title>
+            <Card.Subtitle>@ 11200.01239 USD</Card.Subtitle>
+            <Card.Text className="pt-3 pb-2">
+              <div>Amount: <strong>18.9 OVL</strong></div>
+              <div>Leverage: <strong>1.25x</strong></div>
+              <div>PnL: <strong className="text-danger">-12.78 OVL (-66%)</strong></div>
+            </Card.Text>
+          </Card.Body>
+          <Card.Footer>
+            <Button variant="primary" size="sm">Unwind Position</Button>
+          </Card.Footer>
+        </Card>
+        <Card className="m-2" style={{ width: '18rem' }}>
+          <Card.Body>
+            <Card.Title>Short BTC / USD</Card.Title>
+            <Card.Subtitle>@ 11200.01239 USD</Card.Subtitle>
+            <Card.Text className="pt-3 pb-2">
+              <div>Amount: <strong>18.9 OVL</strong></div>
+              <div>Leverage: <strong>1.25x</strong></div>
+              <div>PnL: <strong className="text-danger">-12.78 OVL (-66%)</strong></div>
+            </Card.Text>
+          </Card.Body>
+          <Card.Footer>
+            <Button variant="primary" size="sm">Unwind Position</Button>
+          </Card.Footer>
+        </Card>
+        <Card className="m-2" style={{ width: '18rem' }}>
+          <Card.Body>
+            <Card.Title>Short BTC / USD</Card.Title>
+            <Card.Subtitle>@ 11200.01239 USD</Card.Subtitle>
+            <Card.Text className="pt-3 pb-2">
+              <div>Amount: <strong>18.9 OVL</strong></div>
+              <div>Leverage: <strong>1.25x</strong></div>
+              <div>PnL: <strong className="text-danger">-12.78 OVL (-66%)</strong></div>
+            </Card.Text>
+          </Card.Body>
+          <Card.Footer>
+            <Button variant="primary" size="sm">Unwind Position</Button>
+          </Card.Footer>
+        </Card>
+        <Card className="m-2" style={{ width: '18rem' }}>
+          <Card.Body>
+            <Card.Title>Short BTC / USD</Card.Title>
+            <Card.Subtitle>@ 11200.01239 USD</Card.Subtitle>
+            <Card.Text className="pt-3 pb-2">
+              <div>Amount: <strong>18.9 OVL</strong></div>
+              <div>Leverage: <strong>1.25x</strong></div>
+              <div>PnL: <strong className="text-danger">-12.78 OVL (-66%)</strong></div>
+            </Card.Text>
+          </Card.Body>
+          <Card.Footer>
+            <Button variant="primary" size="sm">Unwind Position</Button>
+          </Card.Footer>
+        </Card>
+        <Card className="m-2" style={{ width: '18rem' }}>
+          <Card.Body>
+            <Card.Title>Short BTC / USD</Card.Title>
+            <Card.Subtitle>@ 11200.01239 USD</Card.Subtitle>
+            <Card.Text className="pt-3 pb-2">
+              <div>Amount: <strong>18.9 OVL</strong></div>
+              <div>Leverage: <strong>1.25x</strong></div>
+              <div>PnL: <strong className="text-danger">-12.78 OVL (-66%)</strong></div>
+            </Card.Text>
+          </Card.Body>
+          <Card.Footer>
+            <Button variant="primary" size="sm">Unwind Position</Button>
+          </Card.Footer>
+        </Card>
+        </div>
+      </div>
+    );
+  }
+
+  renderMain() {
+    const { view } = this.state;
+    switch (view) {
+      case 'build':
+        return this.renderBuild();
+        break;
+      case 'unwind':
+        return this.renderUnwind();
+        break;
+      case 'liquidate':
+        // return this.renderLiquidate();
+        break;
+      default:
+        console.error('in not supported view');
+    }
+
+  }
+
   render() {
+    const { view } = this.state;
     return (
       <Container>
         <div className="fixed-top">
@@ -782,9 +1040,9 @@ class App extends Component {
           </Navbar.Brand>
           <Navbar.Collapse>
             <Nav className="mr-auto">
-              <Nav.Link active>Build</Nav.Link>
-              <Nav.Link>Unwind</Nav.Link>
-              <Nav.Link>Liquidate</Nav.Link>
+              <Nav.Link active={(view === 'build')} onClick={() => this.setState({ view: 'build' })}>Build</Nav.Link>
+              <Nav.Link active={(view === 'unwind')} onClick={() => this.setState({ view: 'unwind' })}>Unwind</Nav.Link>
+              <Nav.Link active={(view === 'liquidate')} onClick={() => this.setState({ view: 'liquidate' })}>Liquidate</Nav.Link>
             </Nav>
           </Navbar.Collapse>
           {this.renderAccount()}
@@ -793,7 +1051,7 @@ class App extends Component {
         {this.renderModal()}
         <Container className="App">
           {this.renderSelectFeed()}
-          {this.renderFeed()}
+          {this.renderMain()}
           {this.renderToasts()}
         </Container>
       </Container>
@@ -842,6 +1100,22 @@ class App extends Component {
         balance = null;
       }
       this.setState({ balance });
+    } catch (error) {
+      console.error(error);
+    }
+  }
+
+  initializeClaim = async () => {
+    const { account, claimAddress } = this.state;
+    console.log('account:', account);
+    try {
+      const eth = new Eth(window.ethereum);
+      const claimContract = new eth.Contract(config.dev.ovlClaimABI, claimAddress);
+      const hasClaimed = await claimContract.methods.hasClaimed(account).call();
+      const amountToClaim = await claimContract.methods.amount().call();
+      console.log('has claimed', hasClaimed);
+      console.log('claim amount', amountToClaim);
+      this.setState({ hasClaimed, amountToClaim });
     } catch (error) {
       console.error(error);
     }
@@ -919,6 +1193,8 @@ class App extends Component {
   initializeFeed = async () => {
     const { feed, feeds } = this.state;
     await this.getQuote();
+    await this.getOpenPositions();
+    await this.getLiquidatablePositions();
 
     // TODO: Set up listeners
     //switch (feed.feedABIType) {
@@ -950,6 +1226,7 @@ class App extends Component {
   initializeAccount = async () => {
     await this.initializeMetaMask();
     await this.initializeBalance();
+    await this.initializeClaim();
     await this.initializePositions();
     await this.initializeAllowance();
   }
