@@ -48,6 +48,8 @@ class App extends Component {
     // Function bindings
     this.handleShow = this.handleShow.bind(this);
     this.handleClose = this.handleClose.bind(this);
+    this.handleShowUnwindModal = this.handleShowUnwindModal.bind(this);
+    this.handleCloseUnwindModal = this.handleCloseUnwindModal.bind(this);
     this.handleFeedChange = this.handleFeedChange.bind(this);
     this.submitInviteCode = this.submitInviteCode.bind(this);
     this.addFunds = this.addFunds.bind(this);
@@ -55,6 +57,7 @@ class App extends Component {
     this.getOpenPositions = this.getOpenPositions.bind(this);
     this.getLiquidatablePositions = this.getLiquidatablePositions.bind(this);
     this.buildPosition = this.buildPosition.bind(this);
+    this.unwindPosition = this.unwindPosition.bind(this);
 
     this.state = {
       total: {},
@@ -66,6 +69,7 @@ class App extends Component {
       claimAddress: '0xd9d75715bbeeA371357642e0aFbd6DC4113A6B8E',
       hasClaimed: false,
       amountToClaim: 0,
+      posToUnwind: null,
       feeds: {
         'CHAINLINK-BTCUSD': {
           name: 'BTC / USD',
@@ -206,6 +210,7 @@ class App extends Component {
         positions: [],
       },
       show: false,
+      showUnwindModal: false,
       pendingTxHashes: [],
       showPendingTx: false,
       loadingPrice: false,
@@ -226,6 +231,14 @@ class App extends Component {
 
   handleShow() {
     this.setState({ show: true });
+  }
+
+  handleCloseUnwindModal() {
+    this.setState({ showUnwindModal: false, amount: '', posToUnwind: null });
+  }
+
+  handleShowUnwindModal(pos) {
+    this.setState({ showUnwindModal: true, posToUnwind: pos });
   }
 
   async handleFeedChange(e) {
@@ -425,6 +438,67 @@ class App extends Component {
          const newBalance = balance - amountToSend; // TODO: Set up listener for OVL token burns on total
          console.log('new balance', newBalance);
          self.setState({ balance: newBalance });
+       })
+        .on('error', (error) => {
+          console.error(error);
+          // TODO: alert ...
+        });
+    } catch (err) {
+      console.error(err);
+      this.setState({ loadingTrade: false });
+      alert(`Error executing trade: ${err.message}`);
+    }
+  }
+
+  unwindPosition = async () => {
+    const { feed, feeds, account, amount, total, posToUnwind } = this.state;
+    const pos = posToUnwind;
+    try {
+      if (!amount) {
+        throw new Error('Amount of OVL is required');
+      } else if (!feed.price) {
+        throw new Error('Need price quote from oracle');
+      } else if (posToUnwind === null) {
+        throw new Error('Need pos to unwind');
+      }
+
+      // Mark as loading
+      this.setState({ loadingTrade: true });
+
+      console.log('amount', amount);
+      console.log('amount type', typeof amount);
+      console.log('pos amount', pos.amount);
+      console.log('pos amount type', typeof pos.amount);
+      console.log('pos id', pos.id);
+      const eth = new Eth(window.ethereum);
+      const fPosContract = new eth.Contract(config.dev.ovlFPositionABI, feed.marketAddress);
+      console.log('amount to send', this.applyBaseFactor(parseFloat(amount), total.decimals));
+      console.log('pos id to send', pos.id);
+      const amountToSend = this.applyBaseFactor(parseFloat(amount), total.decimals);
+      if (amountToSend > pos.amount) {
+        throw new Error('Amount to unwind must not be larger than OVL amount locked'); // TODO: gray out button in this case (on input event)
+      }
+
+      const self = this;
+      fPosContract.methods.unwind(
+        pos.id,
+        amountToSend.toString(),
+      ).send({ 'from': account })
+       .on('transactionHash', (hash) => {
+         // Update state based on position, balances
+         self.addPendingTxHash(hash);
+         self.setState({ amount: '', loadingTrade: false });
+         // Close the modal
+         self.handleCloseUnwindModal();
+       })
+       .on('receipt', (receipt) => {
+         // TODO: update pos in feed attrs ...
+         console.log('receipt', receipt);
+         console.log('prev amount', amount);
+         console.log('amount sent', amountToSend);
+         const newAmount = pos.amount - amountToSend; // TODO: Set up listener for OVL token burns on total
+         console.log('new amount', newAmount);
+         // self.setState({ feeds, feed });
        })
         .on('error', (error) => {
           console.error(error);
@@ -649,6 +723,59 @@ class App extends Component {
     );
   }
 
+  renderUnwindModal() {
+    const { posToUnwind, feed, total } = this.state;
+    if (posToUnwind === null) {
+      return (<></>);
+    }
+    const pos = posToUnwind;
+    return (
+      <Modal id="uwind-modal" show={this.state.showUnwindModal} onHide={this.handleCloseUnwindModal}>
+        <Modal.Header closeButton>
+          <strong>Unwind Your {feed.name} Position</strong>
+        </Modal.Header>
+        <Modal.Body>
+          <Form>
+            <Form.Label><strong>{this.removeBaseFactor(pos.leverage, total.decimals)}x {pos.long ? "Long" : "Short"} @ {this.removeBaseFactor(pos.lockPrice, feed.decimals)} {feed.denom}</strong></Form.Label>
+            <Form.Label className="mt-2">Price <small className="text-muted">(Last Oracle Price: {numeral(feed.period/(3600.0)).format('0,00.0')}h TWAP; {numeral(feed.period/(3600.0*feed.rounds)).format('0,00.0')}h Sampling Period)</small></Form.Label>
+            {this.renderPriceInModal()}
+            <Form.Label>Amount Locked</Form.Label>
+            <InputGroup className="mb-3">
+              <span className="h4">{this.removeBaseFactor(pos.amount, total.decimals)}</span>
+            </InputGroup>
+            <Form.Label>PnL</Form.Label>
+            <InputGroup className="mb-3">
+              <div className="d-flex align-items-center">
+                <span className="h4">{this.removeBaseFactor(this.calcPnL(pos), total.decimals*2)} OVL {this.calcPnLPerc(pos) > 0 ? <small className="text-success">{this.calcPnLPerc(pos)}%</small> : <small className="text-danger">{this.calcPnLPerc(pos)}%</small>}</span>
+              </div>
+            </InputGroup>
+            <Form.Label>Amount to Unwind</Form.Label>
+            <InputGroup className="mb-3">
+              <FormControl
+                id="trade-amount"
+                type="number"
+                placeholder="0.000"
+                step="0.001"
+                aria-label="Amount"
+                aria-describedby="btnGroupAddon"
+                onChange={(e) => this.setState({ amount: e.target.value })}
+              />
+              <InputGroup.Append>
+                <InputGroup.Text id="btnGroupAddon">OVL</InputGroup.Text>
+              </InputGroup.Append>
+            </InputGroup>
+          </Form>
+        </Modal.Body>
+        <Modal.Footer className="d-flex justify-content-between align-items-center">
+          <div className="d-flex flex-column">
+            <small>Fee: <strong>0.15%</strong></small>
+          </div>
+          {this.renderUnwindModalButton()}
+        </Modal.Footer>
+      </Modal>
+    );
+  }
+
   renderPositionInModal() {
     const { positions, feed } = this.state;
     const symbol = feed.symbol;
@@ -755,6 +882,38 @@ class App extends Component {
       return (
         <Button variant="primary" type="button" disabled>
           Build
+        </Button>
+      );
+    }
+  }
+
+  renderUnwindModalButton() {
+    const { balance, feed, loadingTrade } = this.state;
+    if (feed.price) {
+      if (loadingTrade) {
+        return (
+          <Button variant="primary" type="button">
+            <Spinner
+              as="span"
+              animation="border"
+              size="sm"
+              role="status"
+              aria-hidden="true"
+            />
+            <span className="sr-only">Loading...</span>
+          </Button>
+        );
+      } else {
+        return (
+          <Button variant="primary" type="button" onClick={this.unwindPosition}>
+            Unwind
+          </Button>
+        );
+      }
+    } else {
+      return (
+        <Button variant="primary" type="button" disabled>
+          Unwind
         </Button>
       );
     }
@@ -908,12 +1067,14 @@ class App extends Component {
   calcPnL(pos) {
     const { feed } = this.state;
     const size = pos.leverage * pos.amount;
-    return size * (feed.price - pos.lockPrice) / pos.lockPrice;
+    const side = (pos.long ? 1 : -1);
+    return side * size * (feed.price - pos.lockPrice) / pos.lockPrice;
   }
 
   calcPnLPerc(pos) {
     const { feed } = this.state;
-    return 100 * (feed.price - pos.lockPrice) / pos.lockPrice;
+    const side = (pos.long ? 1 : -1);
+    return 100 * side * (feed.price - pos.lockPrice) / pos.lockPrice;
   }
 
   renderUnwind() {
@@ -938,7 +1099,7 @@ class App extends Component {
                 </Card.Text>
               </Card.Body>
               <Card.Footer>
-                <Button variant="primary" size="sm">Unwind Position</Button>
+                <Button variant="primary" size="sm" onClick={() => this.handleShowUnwindModal(pos)}>Unwind Position</Button>
               </Card.Footer>
             </Card>
           ))}
@@ -1098,6 +1259,7 @@ class App extends Component {
           </Navbar>
         </div>
         {this.renderModal()}
+        {this.renderUnwindModal()}
         <Container className="App">
           {this.renderSelectFeed()}
           {this.renderMain()}
