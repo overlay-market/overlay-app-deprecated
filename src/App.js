@@ -82,6 +82,7 @@ class App extends Component {
           denom: 'USD',
           open: [],
           liquidatable: [],
+          positions: [],
         },
         'CHAINLINK-ETHUSD': {
           name: 'ETH / USD',
@@ -98,6 +99,7 @@ class App extends Component {
           denom: 'USD',
           open: [],
           liquidatable: [],
+          positions: [],
         },
         'CHAINLINK-DAIUSD': {
           name: 'DAI / USD',
@@ -114,6 +116,7 @@ class App extends Component {
           denom: 'USD',
           open: [],
           liquidatable: [],
+          positions: [],
         },
         'CHAINLINK-FASTGAS': {
           name: 'Fast Gas / Gwei',
@@ -130,6 +133,7 @@ class App extends Component {
           denom: 'ETH',
           open: [],
           liquidatable: [],
+          positions: [],
         },
         'UNISWAP-WBTCWETH': {
           name: 'Wrapped BTC / ETH',
@@ -146,6 +150,7 @@ class App extends Component {
           denom: 'ETH',
           open: [],
           liquidatable: [],
+          positions: [],
         },
         'UNISWAP-DAIWETH': {
           name: 'DAI / ETH',
@@ -162,6 +167,7 @@ class App extends Component {
           denom: 'ETH',
           open: [],
           liquidatable: [],
+          positions: [],
         },
         'UNISWAP-OVLWETH': {
           name: 'OVL / ETH',
@@ -178,6 +184,7 @@ class App extends Component {
           denom: 'ETH',
           open: [],
           liquidatable: [],
+          positions: [],
         }
       },
       inviteCode: '',
@@ -196,6 +203,7 @@ class App extends Component {
         denom: 'USD',
         open: [],
         liquidatable: [],
+        positions: [],
       },
       show: false,
       pendingTxHashes: [],
@@ -225,6 +233,7 @@ class App extends Component {
     await this.setState({ feed: feeds[e.target.value], allowance: 99999999999*1e18 });
     await this.initializeFeed();
     await this.initializeAllowance();
+    await this.initializePositions();
   }
 
   submitInviteCode = async () => {
@@ -896,7 +905,47 @@ class App extends Component {
     );
   }
 
+  calcPnL(pos) {
+    const { feed } = this.state;
+    const size = pos.leverage * pos.amount;
+    return size * (feed.price - pos.lockPrice) / pos.lockPrice;
+  }
+
+  calcPnLPerc(pos) {
+    const { feed } = this.state;
+    return 100 * (feed.price - pos.lockPrice) / pos.lockPrice;
+  }
+
   renderUnwind() {
+    const { feed, total } = this.state;
+    return (
+      <div className="pb-5">
+        <hr />
+        <h5>Your Positions</h5>
+        <div className="d-flex flex-wrap justify-content-between">
+          {Object.values(feed.positions).map((pos) => (
+            <Card key={pos.id} className="m-2" style={{ width: '18rem' }}>
+              <Card.Body>
+                <Card.Title>{pos.long ? "Long" : "Short"} {feed.name}</Card.Title>
+                <Card.Subtitle>@ {this.removeBaseFactor(pos.lockPrice, feed.decimals)} {feed.denom}</Card.Subtitle>
+                <Card.Text className="pt-3 pb-2">
+                  <div>Amount: <strong>{this.removeBaseFactor(pos.amount, total.decimals)} OVL</strong></div>
+                  <div>Leverage: <strong>{this.removeBaseFactor(pos.leverage, total.decimals)}x</strong></div>
+                  <div className='py-2 d-flex flex-column'>
+                    <small>Liquidation Price: <strong>{this.removeBaseFactor(pos.liquidationPrice, feed.decimals)} {feed.denom}</strong></small>
+                    <small>PnL: <strong>{this.removeBaseFactor(this.calcPnL(pos), total.decimals*2)} OVL {this.calcPnLPerc(pos) > 0 ? <span className="text-success">{this.calcPnLPerc(pos)}%</span> : <span className="text-danger">{this.calcPnLPerc(pos)}%</span>}</strong></small>
+                  </div>
+                </Card.Text>
+              </Card.Body>
+              <Card.Footer>
+                <Button variant="primary" size="sm">Unwind Position</Button>
+              </Card.Footer>
+            </Card>
+          ))}
+        </div>
+      </div>
+    );
+
     return (
       <div className="pb-5">
         <hr/>
@@ -1122,14 +1171,50 @@ class App extends Component {
   }
 
   initializePositions = async () => {
-    // From firebase (but eventually from smart contract)
-    // Positions { symbol: { amount, avg_price } }
-    const { account } = this.state;
+    const { account, feeds, feed } = this.state;
+    if (feed.open.length === 0) {
+      return;
+    }
+
     try {
-      const positions = (await firebase.firestore().collection("positions").doc(account).get()).data();
-      this.setState({ positions });
-    } catch (error) {
-      console.error(error);
+      // Mark as loading
+      this.setState({ loadingPositions: true });
+
+      // Batch fetch balances for open positions on market
+      const eth = new Eth(window.ethereum);
+      const fPosContract = new eth.Contract(config.dev.ovlFPositionABI, feed.marketAddress);
+
+      var accs = [];
+      for (var i = 0; i < feed.open.length; i++) {
+        accs.push(account);
+      }
+      console.log('assemble pos accs:', accs);
+      console.log('assemble pos open:', feed.open);
+
+      const amounts = await fPosContract.methods.balanceOfBatch(accs, feed.open).call();
+      console.log('assemble amounts:', amounts);
+      var positions = {};
+      // TODO: set up a json endpoint for id uri instead of this?
+      for (var i = 0; i < amounts.length; i++) {
+        const id = feed.open[i];
+        const amount = parseFloat(amounts[i]);
+        if (amount === 0) {
+          continue;
+        }
+
+        const long = await fPosContract.methods.isLong(id).call();
+        const leverage = await fPosContract.methods.leverageOf(id).call();
+        const lockPrice = await fPosContract.methods.lockPriceOf(id).call();
+        const liquidationPrice = await fPosContract.methods.liquidationPriceOf(id).call();
+        positions[id] = { id, amount, long, leverage: parseFloat(leverage), lockPrice: parseFloat(lockPrice), liquidationPrice: parseFloat(liquidationPrice) };
+      }
+
+      console.log('assembled positions', positions);
+      feeds[feed.symbol].positions = feed.positions = positions;
+      this.setState({ feeds, feed, loadingPositions: false });
+    } catch (err) {
+      console.error(err);
+      this.setState({ loadingPositions: false });
     }
   }
 
@@ -1229,6 +1314,7 @@ class App extends Component {
     await this.initializeClaim();
     await this.initializePositions();
     await this.initializeAllowance();
+
   }
 
   initializeMetaMaskListeners = () => {
