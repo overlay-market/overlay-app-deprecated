@@ -88,6 +88,7 @@ class App extends Component {
           open: [],
           liquidatable: [],
           positions: [],
+          positionsLiquidatable: [],
         },
         'CHAINLINK-ETHUSD': {
           name: 'ETH / USD',
@@ -105,6 +106,7 @@ class App extends Component {
           open: [],
           liquidatable: [],
           positions: [],
+          positionsLiquidatable: [],
         },
         'CHAINLINK-DAIUSD': {
           name: 'DAI / USD',
@@ -122,6 +124,7 @@ class App extends Component {
           open: [],
           liquidatable: [],
           positions: [],
+          positionsLiquidatable: [],
         },
         'CHAINLINK-FASTGAS': {
           name: 'Fast Gas / Gwei',
@@ -139,6 +142,7 @@ class App extends Component {
           open: [],
           liquidatable: [],
           positions: [],
+          positionsLiquidatable: [],
         },
         'UNISWAP-WBTCWETH': {
           name: 'Wrapped BTC / ETH',
@@ -156,6 +160,7 @@ class App extends Component {
           open: [],
           liquidatable: [],
           positions: [],
+          positionsLiquidatable: [],
         },
         'UNISWAP-DAIWETH': {
           name: 'DAI / ETH',
@@ -173,6 +178,7 @@ class App extends Component {
           open: [],
           liquidatable: [],
           positions: [],
+          positionsLiquidatable: [],
         },
         'UNISWAP-OVLWETH': {
           name: 'OVL / ETH',
@@ -190,6 +196,7 @@ class App extends Component {
           open: [],
           liquidatable: [],
           positions: [],
+          positionsLiquidatable: [],
         }
       },
       inviteCode: '',
@@ -209,6 +216,7 @@ class App extends Component {
         open: [],
         liquidatable: [],
         positions: [],
+        positionsLiquidatable: [],
       },
       show: false,
       showUnwindModal: false,
@@ -216,6 +224,7 @@ class App extends Component {
       showPendingTx: false,
       loadingPrice: false,
       loadingPositions: false,
+      loadingLiquidatablePositions: false,
       loadingApproval: false,
       loadingFunds: false,
       loadingTrade: false,
@@ -353,18 +362,22 @@ class App extends Component {
     const { feeds, feed } = this.state;
     try {
       // Mark as loading
-      this.setState({ loadingPositions: true });
+      this.setState({ loadingLiquidatablePositions: true });
 
       // Fetch open positions for market
       const eth = new Eth(window.ethereum);
       const fPosContract = new eth.Contract(config.dev.ovlFPositionABI, feed.marketAddress);
       const liq = await fPosContract.methods.liquidatable().call();
 
-      feeds[feed.symbol].liquidatable = feed.liquidatable = liq;
-      this.setState({ feeds, feed, loadingPositions: false });
+      console.log('liquidatable pos ids:', liq);
+      const liquidatable = liq.filter((id) => id !== "0");
+      console.log('liquidatable pos ids filtered:', liquidatable);
+
+      feeds[feed.symbol].liquidatable = feed.liquidatable = liquidatable;
+      this.setState({ feeds, feed, loadingLiquidatablePositions: false });
     } catch (err) {
       console.error(err);
-      this.setState({ loadingPositions: false });
+      this.setState({ loadingLiquidatablePositions: false });
     }
   }
 
@@ -1148,110 +1161,34 @@ class App extends Component {
         </div>
       </div>
     );
+  }
 
+  renderLiquidate() {
+    const { feed, feeds, total } = this.state;
     return (
       <div className="pb-5">
-        <hr/>
-        <h5 className="my-2">Your Positions</h5>
-        <div className="d-flex flex-wrap justify-content-around">
-        <Card className="m-2" style={{ width: '18rem' }}>
-          <Card.Body>
-            <Card.Title>Long BTC / USD</Card.Title>
-            <Card.Subtitle>@ 11200.01239 USD</Card.Subtitle>
-            <Card.Text className="pt-3 pb-2">
-              <div>Amount: <strong>18.9 OVL</strong></div>
-              <div>Leverage: <strong>1.25x</strong></div>
-              <div>PnL: <strong className="text-success">12.78 OVL (+66%)</strong></div>
-            </Card.Text>
-          </Card.Body>
-          <Card.Footer>
-            <Button variant="primary" size="sm">Unwind Position</Button>
-          </Card.Footer>
-        </Card>
-        <Card className="m-2" style={{ width: '18rem' }}>
-          <Card.Body>
-            <Card.Title>Short BTC / USD</Card.Title>
-            <Card.Subtitle>@ 11200.01239 USD</Card.Subtitle>
-            <Card.Text className="pt-3 pb-2">
-              <div>Amount: <strong>18.9 OVL</strong></div>
-              <div>Leverage: <strong>1.25x</strong></div>
-              <div>PnL: <strong className="text-danger">-12.78 OVL (-66%)</strong></div>
-            </Card.Text>
-          </Card.Body>
-          <Card.Footer>
-            <Button variant="primary" size="sm">Unwind Position</Button>
-          </Card.Footer>
-        </Card>
-        <Card className="m-2" style={{ width: '18rem' }}>
-          <Card.Body>
-            <Card.Title>Short BTC / USD</Card.Title>
-            <Card.Subtitle>@ 11200.01239 USD</Card.Subtitle>
-            <Card.Text className="pt-3 pb-2">
-              <div>Amount: <strong>18.9 OVL</strong></div>
-              <div>Leverage: <strong>1.25x</strong></div>
-              <div>PnL: <strong className="text-danger">-12.78 OVL (-66%)</strong></div>
-            </Card.Text>
-          </Card.Body>
-          <Card.Footer>
-            <Button variant="primary" size="sm">Unwind Position</Button>
-          </Card.Footer>
-        </Card>
-        <Card className="m-2" style={{ width: '18rem' }}>
-          <Card.Body>
-            <Card.Title>Short BTC / USD</Card.Title>
-            <Card.Subtitle>@ 11200.01239 USD</Card.Subtitle>
-            <Card.Text className="pt-3 pb-2">
-              <div>Amount: <strong>18.9 OVL</strong></div>
-              <div>Leverage: <strong>1.25x</strong></div>
-              <div>PnL: <strong className="text-danger">-12.78 OVL (-66%)</strong></div>
-            </Card.Text>
-          </Card.Body>
-          <Card.Footer>
-            <Button variant="primary" size="sm">Unwind Position</Button>
-          </Card.Footer>
-        </Card>
-        <Card className="m-2" style={{ width: '18rem' }}>
-          <Card.Body>
-            <Card.Title>Short BTC / USD</Card.Title>
-            <Card.Subtitle>@ 11200.01239 USD</Card.Subtitle>
-            <Card.Text className="pt-3 pb-2">
-              <div>Amount: <strong>18.9 OVL</strong></div>
-              <div>Leverage: <strong>1.25x</strong></div>
-              <div>PnL: <strong className="text-danger">-12.78 OVL (-66%)</strong></div>
-            </Card.Text>
-          </Card.Body>
-          <Card.Footer>
-            <Button variant="primary" size="sm">Unwind Position</Button>
-          </Card.Footer>
-        </Card>
-        <Card className="m-2" style={{ width: '18rem' }}>
-          <Card.Body>
-            <Card.Title>Short BTC / USD</Card.Title>
-            <Card.Subtitle>@ 11200.01239 USD</Card.Subtitle>
-            <Card.Text className="pt-3 pb-2">
-              <div>Amount: <strong>18.9 OVL</strong></div>
-              <div>Leverage: <strong>1.25x</strong></div>
-              <div>PnL: <strong className="text-danger">-12.78 OVL (-66%)</strong></div>
-            </Card.Text>
-          </Card.Body>
-          <Card.Footer>
-            <Button variant="primary" size="sm">Unwind Position</Button>
-          </Card.Footer>
-        </Card>
-        <Card className="m-2" style={{ width: '18rem' }}>
-          <Card.Body>
-            <Card.Title>Short BTC / USD</Card.Title>
-            <Card.Subtitle>@ 11200.01239 USD</Card.Subtitle>
-            <Card.Text className="pt-3 pb-2">
-              <div>Amount: <strong>18.9 OVL</strong></div>
-              <div>Leverage: <strong>1.25x</strong></div>
-              <div>PnL: <strong className="text-danger">-12.78 OVL (-66%)</strong></div>
-            </Card.Text>
-          </Card.Body>
-          <Card.Footer>
-            <Button variant="primary" size="sm">Unwind Position</Button>
-          </Card.Footer>
-        </Card>
+        <hr />
+        <h5>Outstanding Liquidatable Positions</h5>
+        <small className="text-secondary"><strong>Reward: 50% of total OVL locked (less fees)</strong></small>
+        <div className="d-flex flex-wrap justify-content-between">
+          {Object.values(feed.positionsLiquidatable).map((pos) => (
+            <Card key={pos.id} className="m-2" style={{ width: '18rem' }}>
+              <Card.Body>
+                <Card.Title>{pos.long ? "Long" : "Short"} {feed.name}</Card.Title>
+                <Card.Subtitle>@ {this.removeBaseFactor(pos.lockPrice, feed.decimals)} {feed.denom}</Card.Subtitle>
+                <Card.Text className="pt-3 pb-2">
+                  <div>Total Amount Locked: <strong>{this.removeBaseFactor(pos.amount, total.decimals)} OVL</strong></div>
+                  <div>Leverage: <strong>{this.removeBaseFactor(pos.leverage, total.decimals)}x</strong></div>
+                  <div className='py-2 d-flex flex-column'>
+                    <small>Liquidation Price: <strong>{this.removeBaseFactor(pos.liquidationPrice, feed.decimals)} {feed.denom}</strong></small>
+                  </div>
+                </Card.Text>
+              </Card.Body>
+              <Card.Footer>
+                <Button variant="primary" size="sm" onClick={() => console.log('Liquidate modal!')}>Liquidate Position</Button>
+              </Card.Footer>
+            </Card>
+          ))}
         </div>
       </div>
     );
@@ -1267,7 +1204,7 @@ class App extends Component {
         return this.renderUnwind();
         break;
       case 'liquidate':
-        // return this.renderLiquidate();
+        return this.renderLiquidate();
         break;
       default:
         console.error('in not supported view');
@@ -1422,6 +1359,42 @@ class App extends Component {
     }
   }
 
+  initializePositionsLiquidatable = async () => {
+    const { feeds, feed } = this.state;
+    if (feed.liquidatable.length === 0) {
+      return;
+    }
+
+    try {
+      // Mark as loading
+      this.setState({ loadingLiquidatablePositions: true });
+
+      // Batch fetch balances for open positions on market
+      const eth = new Eth(window.ethereum);
+      const fPosContract = new eth.Contract(config.dev.ovlFPositionABI, feed.marketAddress);
+
+      var positionsLiquidatable = {};
+      // TODO: set up a json endpoint for id uri instead of this?
+      for (var i = 0; i < feed.liquidatable.length; i++) {
+        const id = feed.liquidatable[i];
+        const amountLockedIn = await fPosContract.methods.amountLockedIn(id).call();
+        const amount = parseFloat(amountLockedIn);
+        const long = await fPosContract.methods.isLong(id).call();
+        const leverage = await fPosContract.methods.leverageOf(id).call();
+        const lockPrice = await fPosContract.methods.lockPriceOf(id).call();
+        const liquidationPrice = await fPosContract.methods.liquidationPriceOf(id).call();
+        positionsLiquidatable[id] = { id, amount, long, leverage: parseFloat(leverage), lockPrice: parseFloat(lockPrice), liquidationPrice: parseFloat(liquidationPrice) };
+      }
+
+      console.log('assembled liquidatable positions', positionsLiquidatable);
+      feeds[feed.symbol].positionsLiquidatable = feed.positionsLiquidatable = positionsLiquidatable;
+      this.setState({ feeds, feed, loadingLiquidatablePositions: false });
+    } catch (err) {
+      console.error(err);
+      this.setState({ loadingLiquidatablePositions: false });
+    }
+  }
+
   initializeAllowance = async () => {
     const { account, feed, tokenAddress } = this.state;
     if (account === null) {
@@ -1461,17 +1434,14 @@ class App extends Component {
     // Set up listeners for mint/burn events
     const self = this;
     tokenContract.events.Transfer()
-     .on('data', (event) => {
-       if (event.returnValues.from === "0x0000000000000000000000000000000000000000") {
+     .on('data', async (event) => {
+       console.log('new token transfer event:', event);
+       if (event.returnValues.from === "0x0000000000000000000000000000000000000000" || event.returnValues.to === "0x0000000000000000000000000000000000000000") {
          // mint
          console.log('previous supply', supply);
-         const newSupply = supply + parseFloat(event.returnValues.value);
-         self.setState({ total: { supply: newSupply, decimals: decimals } });
-         console.log('new supply', newSupply);
-       } else if (event.returnValues.to === "0x0000000000000000000000000000000000000000") {
-         // burn
-         console.log('previous supply', supply);
-         const newSupply = supply - parseFloat(event.returnValues.value);
+
+         const fetchedSupply = await tokenContract.methods.totalSupply().call();
+         const newSupply = parseFloat(fetchedSupply);
          self.setState({ total: { supply: newSupply, decimals: decimals } });
          console.log('new supply', newSupply);
        }
@@ -1484,14 +1454,7 @@ class App extends Component {
     await this.getQuote();
     await this.getOpenPositions();
     await this.getLiquidatablePositions();
-
-    // TODO: Set up listeners
-    //switch (feed.feedABIType) {
-    //  case 'ovlChainlinkFeedABI':
-    //    break;
-    //  default:
-    //    console.log('feed type not supported for listeners');
-    //}
+    await this.initializePositionsLiquidatable();
   }
 
   initializeFeeds = async () => {
