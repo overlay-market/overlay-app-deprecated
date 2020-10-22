@@ -51,6 +51,7 @@ class App extends Component {
     this.handleShowUnwindModal = this.handleShowUnwindModal.bind(this);
     this.handleCloseUnwindModal = this.handleCloseUnwindModal.bind(this);
     this.handleFeedChange = this.handleFeedChange.bind(this);
+    this.handleBuildPositionReceipt = this.handleBuildPositionReceipt.bind(this);
     this.submitInviteCode = this.submitInviteCode.bind(this);
     this.addFunds = this.addFunds.bind(this);
     this.getQuote = this.getQuote.bind(this);
@@ -220,7 +221,7 @@ class App extends Component {
       loadingTrade: false,
       side: 1, // either 1 for long or -1 for short
       amount: '',
-      view: 'build',
+      view: 'build', // TODO: react router
       leverage: 1,
     };
   }
@@ -431,13 +432,8 @@ class App extends Component {
          // Close the modal
          self.handleClose();
        })
-       .on('receipt', (receipt) => {
-         console.log('receipt', receipt);
-         console.log('prev balance', balance);
-         console.log('amount sent', amountToSend);
-         const newBalance = balance - amountToSend; // TODO: Set up listener for OVL token burns on total
-         console.log('new balance', newBalance);
-         self.setState({ balance: newBalance });
+       .on('receipt', async (receipt) => {
+         self.handleBuildPositionReceipt(fPosContract, feed, receipt);
        })
         .on('error', (error) => {
           console.error(error);
@@ -448,6 +444,34 @@ class App extends Component {
       this.setState({ loadingTrade: false });
       alert(`Error executing trade: ${err.message}`);
     }
+  }
+
+  handleBuildPositionReceipt = async (fPosContract, buildFeed, receipt) => {
+    const { feeds, feed, balance } = this.state;
+    // Get the details of the Build event
+    console.log('build pos receipt', receipt);
+    console.log('build pos receipt fposcontract', fPosContract);
+    console.log('build pos receipt buildFeed', buildFeed);
+    console.log('build pos receipt current feed', feed);
+    const id = receipt.events.Build.returnValues.id;
+    const amount = parseFloat(receipt.events.Build.returnValues.value);
+
+    console.log('build pos receipt prev balance', balance);
+    const newBalance = balance - amount;
+    console.log('build pos receipt new balance', newBalance);
+
+    const long = await fPosContract.methods.isLong(id).call();
+    const leverage = await fPosContract.methods.leverageOf(id).call();
+    const lockPrice = await fPosContract.methods.lockPriceOf(id).call();
+    const liquidationPrice = await fPosContract.methods.liquidationPriceOf(id).call();
+    const pos = { id, amount, long, leverage: parseFloat(leverage), lockPrice: parseFloat(lockPrice), liquidationPrice: parseFloat(liquidationPrice) };
+    console.log('build pos receipt pos', pos);
+
+    feeds[buildFeed.symbol].positions[id] = pos;
+    if (feed.symbol === buildFeed.symbol) {
+      feed.positions[id] = pos;
+    }
+    this.setState({ feeds, feed, balance: newBalance });
   }
 
   unwindPosition = async () => {
@@ -1078,7 +1102,25 @@ class App extends Component {
   }
 
   renderUnwind() {
-    const { feed, total } = this.state;
+    const { feed, total, loadingPositions } = this.state;
+    if (loadingPositions) {
+      return (
+        <div className="pb-5">
+          <hr />
+          <h5>Your Positions</h5>
+          <div className="d-flex flex-wrap justify-content-between">
+            <Spinner
+              as="span"
+              animation="border"
+              size="sm"
+              role="status"
+              aria-hidden="true"
+            />
+          </div>
+        </div>
+      );
+    }
+
     return (
       <div className="pb-5">
         <hr />
@@ -1094,7 +1136,7 @@ class App extends Component {
                   <div>Leverage: <strong>{this.removeBaseFactor(pos.leverage, total.decimals)}x</strong></div>
                   <div className='py-2 d-flex flex-column'>
                     <small>Liquidation Price: <strong>{this.removeBaseFactor(pos.liquidationPrice, feed.decimals)} {feed.denom}</strong></small>
-                    <small>PnL: <strong>{this.removeBaseFactor(this.calcPnL(pos), total.decimals*2)} OVL {this.calcPnLPerc(pos) > 0 ? <span className="text-success">{this.calcPnLPerc(pos)}%</span> : <span className="text-danger">{this.calcPnLPerc(pos)}%</span>}</strong></small>
+                    <small>PnL: <strong>{this.removeBaseFactor(this.calcPnL(pos), total.decimals*2)} OVL {this.calcPnLPerc(pos) !== 0 ? this.calcPnLPerc(pos) > 0 ? <span className="text-success">{this.calcPnLPerc(pos)}%</span> : <span className="text-danger">{this.calcPnLPerc(pos)}%</span> : <></>}</strong></small>
                   </div>
                 </Card.Text>
               </Card.Body>
