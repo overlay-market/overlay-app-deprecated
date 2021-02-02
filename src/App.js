@@ -38,6 +38,7 @@ import metaMaskSrc from './metamask.svg';
 import constants from './constants';
 import './App.css';
 import config from './config';
+import AlertDismissible from './components/alertDismissible';
 
 library.add(faSync);
 
@@ -63,7 +64,7 @@ class App extends Component {
     this.state = {
       total: {},
       account: null,
-      allowance: 999999999999*1e18,
+      allowance: 999999999999 * 1e18,
       positions: null,
       balance: null,
       tokenAddress: '0x1c8D468bFdc4D7c153e34811de191AD08A33a278',
@@ -253,7 +254,7 @@ class App extends Component {
 
   async handleFeedChange(e) {
     const { feeds } = this.state;
-    await this.setState({ feed: feeds[e.target.value], allowance: 99999999999*1e18 });
+    await this.setState({ feed: feeds[e.target.value], allowance: 99999999999 * 1e18 });
     await this.initializeFeed();
     await this.initializeAllowance();
     await this.initializePositions();
@@ -285,20 +286,20 @@ class App extends Component {
       const claimContract = new eth.Contract(config.dev.ovlClaimABI, claimAddress);
       const self = this;
       claimContract.methods.withdraw()
-       .send({ 'from': account })
-       .on('transactionHash', (hash) => {
-         // Update state based on position, balances
-         self.addPendingTxHash(hash);
-         self.setState({ hasClaimed: true, loadingFunds: false });
-       })
-       .on('receipt', (receipt) => {
-         console.log('receipt', receipt);
-         console.log('prev balance', balance);
-         console.log('claims withdrawn', amountToClaim); // TODO: Fix balance being off after claim!
-         const newBalance = balance + amountToClaim; // TODO: Set up listener for OVL token burns on total
-         console.log('new balance', newBalance);
-         self.setState({ balance: newBalance });
-       })
+        .send({ 'from': account })
+        .on('transactionHash', (hash) => {
+          // Update state based on position, balances
+          self.addPendingTxHash(hash);
+          self.setState({ hasClaimed: true, loadingFunds: false });
+        })
+        .on('receipt', (receipt) => {
+          console.log('receipt', receipt);
+          console.log('prev balance', balance);
+          console.log('claims withdrawn', amountToClaim); // TODO: Fix balance being off after claim!
+          const newBalance = balance + amountToClaim; // TODO: Set up listener for OVL token burns on total
+          console.log('new balance', newBalance);
+          self.setState({ balance: newBalance });
+        })
         .on('error', (error) => {
           console.error(error);
           // TODO: alert ...
@@ -396,7 +397,7 @@ class App extends Component {
       ).send({ 'from': account }); // TODO: gasPrice ...
 
       // Store allowance
-      const allowance = 999999999999*1e18; // get from tx.Approval event value
+      const allowance = 999999999999 * 1e18; // get from tx.Approval event value
       this.setState({ allowance, loadingPrice: false });
     } catch (err) {
       console.error(err);
@@ -438,16 +439,16 @@ class App extends Component {
         (side === 1),
         leverageToSend.toString(),
       ).send({ 'from': account })
-       .on('transactionHash', (hash) => {
-         // Update state based on position, balances
-         self.addPendingTxHash(hash);
-         self.setState({ amount: '', side: 1, leverage: 1, loadingTrade: false });
-         // Close the modal
-         self.handleClose();
-       })
-       .on('receipt', async (receipt) => {
-         self.handleBuildPositionReceipt(fPosContract, feed, receipt);
-       })
+        .on('transactionHash', (hash) => {
+          // Update state based on position, balances
+          self.addPendingTxHash(hash);
+          self.setState({ amount: '', side: 1, leverage: 1, loadingTrade: false });
+          // Close the modal
+          self.handleClose();
+        })
+        .on('receipt', async (receipt) => {
+          self.handleBuildPositionReceipt(fPosContract, feed, receipt);
+        })
         .on('error', (error) => {
           console.error(error);
           // TODO: alert ...
@@ -521,22 +522,22 @@ class App extends Component {
         pos.id,
         amountToSend.toString(),
       ).send({ 'from': account })
-       .on('transactionHash', (hash) => {
-         // Update state based on position, balances
-         self.addPendingTxHash(hash);
-         self.setState({ amount: '', loadingTrade: false });
-         // Close the modal
-         self.handleCloseUnwindModal();
-       })
-       .on('receipt', (receipt) => {
-         // TODO: update pos in feed attrs ...
-         console.log('receipt', receipt);
-         console.log('prev amount', amount);
-         console.log('amount sent', amountToSend);
-         const newAmount = pos.amount - amountToSend; // TODO: Set up listener for OVL token burns on total
-         console.log('new amount', newAmount);
-         // self.setState({ feeds, feed });
-       })
+        .on('transactionHash', (hash) => {
+          // Update state based on position, balances
+          self.addPendingTxHash(hash);
+          self.setState({ amount: '', loadingTrade: false });
+          // Close the modal
+          self.handleCloseUnwindModal();
+        })
+        .on('receipt', (receipt) => {
+          // TODO: update pos in feed attrs ...
+          console.log('receipt', receipt);
+          console.log('prev amount', amount);
+          console.log('amount sent', amountToSend);
+          const newAmount = pos.amount - amountToSend; // TODO: Set up listener for OVL token burns on total
+          console.log('new amount', newAmount);
+          // self.setState({ feeds, feed });
+        })
         .on('error', (error) => {
           console.error(error);
           // TODO: alert ...
@@ -557,10 +558,10 @@ class App extends Component {
     const price = this.removeBaseFactor(feed.price, feed.decimals);
     if (side === 1) {
       // long: liquidate = lockPrice * (1-1/leverage); liquidate when pnl = -amount so no debt
-      return price * (1 - 1/leverage);
+      return price * (1 - 1 / leverage);
     } else {
       // short: liquidate = lockPrice * (1+1/leverage)
-      return price * (1 + 1/leverage);
+      return price * (1 + 1 / leverage);
     }
   }
 
@@ -706,7 +707,7 @@ class App extends Component {
               height='150'
               widgetType='MiniWidget'
             />
-            <Form.Label className="mt-3">Price <small className="text-muted">(Last Oracle Price: {numeral(feed.period/(3600.0)).format('0,00.0')}h TWAP; {numeral(feed.period/(3600.0*feed.rounds)).format('0,00.0')}h Sampling Period)</small></Form.Label>
+            <Form.Label className="mt-3">Price <small className="text-muted">(Last Oracle Price: {numeral(feed.period / (3600.0)).format('0,00.0')}h TWAP; {numeral(feed.period / (3600.0 * feed.rounds)).format('0,00.0')}h Sampling Period)</small></Form.Label>
             {this.renderPriceInModal()}
             <Form.Label>Side</Form.Label>
             <ButtonToolbar className="mb-3">
@@ -774,7 +775,7 @@ class App extends Component {
         <Modal.Body>
           <Form>
             <Form.Label><strong>{this.removeBaseFactor(pos.leverage, total.decimals)}x {pos.long ? "Long" : "Short"} @ {this.removeBaseFactor(pos.lockPrice, feed.decimals)} {feed.denom}</strong></Form.Label>
-            <Form.Label className="mt-2">Price <small className="text-muted">(Last Oracle Price: {numeral(feed.period/(3600.0)).format('0,00.0')}h TWAP; {numeral(feed.period/(3600.0*feed.rounds)).format('0,00.0')}h Sampling Period)</small></Form.Label>
+            <Form.Label className="mt-2">Price <small className="text-muted">(Last Oracle Price: {numeral(feed.period / (3600.0)).format('0,00.0')}h TWAP; {numeral(feed.period / (3600.0 * feed.rounds)).format('0,00.0')}h Sampling Period)</small></Form.Label>
             {this.renderPriceInModal()}
             <Form.Label>Amount Locked</Form.Label>
             <InputGroup className="mb-3">
@@ -783,7 +784,7 @@ class App extends Component {
             <Form.Label>PnL</Form.Label>
             <InputGroup className="mb-3">
               <div className="d-flex align-items-center">
-                <span className="h4">{this.removeBaseFactor(this.calcPnL(pos), total.decimals*2)} OVL {this.calcPnLPerc(pos) > 0 ? <small className="text-success">{this.calcPnLPerc(pos)}%</small> : <small className="text-danger">{this.calcPnLPerc(pos)}%</small>}</span>
+                <span className="h4">{this.removeBaseFactor(this.calcPnL(pos), total.decimals * 2)} OVL {this.calcPnLPerc(pos) > 0 ? <small className="text-success">{this.calcPnLPerc(pos)}%</small> : <small className="text-danger">{this.calcPnLPerc(pos)}%</small>}</span>
               </div>
             </InputGroup>
             <Form.Label>Amount to Unwind</Form.Label>
@@ -974,7 +975,7 @@ class App extends Component {
 
   renderToasts() {
     const { pendingTxHashes, showPendingTx } = this.state;
-    const hash = pendingTxHashes[pendingTxHashes.length-1];
+    const hash = pendingTxHashes[pendingTxHashes.length - 1];
     if (!hash) {
       return (<></>);
     }
@@ -984,9 +985,20 @@ class App extends Component {
           <Toast.Header>
             <strong className="mr-auto">Submitted</strong>
           </Toast.Header>
-          <Toast.Body><strong>Tx Hash:</strong> <a href={`https://rinkeby.etherscan.io/tx/${hash}`} target="_blank">{`${hash.substring(0, 8)}...${hash.substring(hash.length-8, hash.length)}`}</a></Toast.Body>
+          <Toast.Body><strong>Tx Hash:</strong> <a href={`https://rinkeby.etherscan.io/tx/${hash}`} target="_blank">{`${hash.substring(0, 8)}...${hash.substring(hash.length - 8, hash.length)}`}</a></Toast.Body>
         </Toast>
       </Navbar>
+    );
+  }
+
+  renderAlert() {
+    const body = "The system is still under research. This is a testnet implementation prior to changes needed for long-term stability and robustness.";
+    return (
+      <AlertDismissible
+        variant="warning"
+        header="Warning"
+        body={body}
+      />
     );
   }
 
@@ -994,11 +1006,11 @@ class App extends Component {
     const { feeds, feed } = this.state;
     return (
       <Form.Control as="select" className="my-2" defaultValue={feed.symbol} onChange={this.handleFeedChange}>
-      {
-        Object.keys(feeds).map(symbol => {
-          const feed = feeds[symbol];
-          return (<option value={symbol}>{symbol}</option>);
-      })}
+        {
+          Object.keys(feeds).map(symbol => {
+            const feed = feeds[symbol];
+            return (<option value={symbol}>{symbol}</option>);
+          })}
       </Form.Control>
     );
   }
@@ -1016,7 +1028,7 @@ class App extends Component {
         />
       );
     } else if (feed.price !== '') {
-      return (<div>{this.removeBaseFactor(feed.price, feed.decimals)} {feed.denom} <small className="text-muted"><small>({numeral(feed.period/(3600.0)).format('0,00.0')}h TWAP)</small></small><Button className="ml-1" variant="link" size="sm" onClick={this.getQuote}><FontAwesomeIcon icon="sync" /></Button></div>);
+      return (<div>{this.removeBaseFactor(feed.price, feed.decimals)} {feed.denom} <small className="text-muted"><small>({numeral(feed.period / (3600.0)).format('0,00.0')}h TWAP)</small></small><Button className="ml-1" variant="link" size="sm" onClick={this.getQuote}><FontAwesomeIcon icon="sync" /></Button></div>);
     } else {
       return (<></>);
     }
@@ -1025,7 +1037,7 @@ class App extends Component {
   renderBuildPositionButton() {
     const { account, allowance, feed, loadingApproval } = this.state;
     if (allowance > 0 || !account) {
-      return (<Button variant="primary" size="md" type="button" onClick={this.handleShow} disabled={( account === null )}>Build New Position</Button>);
+      return (<Button variant="primary" size="md" type="button" onClick={this.handleShow} disabled={(account === null)}>Build New Position</Button>);
     } else {
       if (loadingApproval) {
         return (
@@ -1149,7 +1161,7 @@ class App extends Component {
                   <div>Leverage: <strong>{this.removeBaseFactor(pos.leverage, total.decimals)}x</strong></div>
                   <div className='py-2 d-flex flex-column'>
                     <small>Liquidation Price: <strong>{this.removeBaseFactor(pos.liquidationPrice, feed.decimals)} {feed.denom}</strong></small>
-                    <small>PnL: <strong>{this.removeBaseFactor(this.calcPnL(pos), total.decimals*2)} OVL {this.calcPnLPerc(pos) !== 0 ? this.calcPnLPerc(pos) > 0 ? <span className="text-success">{this.calcPnLPerc(pos)}%</span> : <span className="text-danger">{this.calcPnLPerc(pos)}%</span> : <></>}</strong></small>
+                    <small>PnL: <strong>{this.removeBaseFactor(this.calcPnL(pos), total.decimals * 2)} OVL {this.calcPnLPerc(pos) !== 0 ? this.calcPnLPerc(pos) > 0 ? <span className="text-success">{this.calcPnLPerc(pos)}%</span> : <span className="text-danger">{this.calcPnLPerc(pos)}%</span> : <></>}</strong></small>
                   </div>
                 </Card.Text>
               </Card.Body>
@@ -1219,27 +1231,28 @@ class App extends Component {
         <div className="fixed-top">
           {this.renderTotalNav()}
           <Navbar bg="light" variant="light" className="border-bottom">
-          <Navbar.Brand>
-            <img
-              src={bannerSrc}
-              height="35"
-              className="d-inline-block align-top"
-            alt="React Bootstrap logo"
-          />
-          </Navbar.Brand>
-          <Navbar.Collapse>
-            <Nav className="mr-auto">
-              <Nav.Link active={(view === 'build')} onClick={() => this.setState({ view: 'build' })}>Build</Nav.Link>
-              <Nav.Link active={(view === 'unwind')} onClick={() => this.setState({ view: 'unwind' })}>Unwind</Nav.Link>
-              <Nav.Link active={(view === 'liquidate')} onClick={() => this.setState({ view: 'liquidate' })}>Liquidate</Nav.Link>
-            </Nav>
-          </Navbar.Collapse>
-          {this.renderAccount()}
+            <Navbar.Brand>
+              <img
+                src={bannerSrc}
+                height="35"
+                className="d-inline-block align-top"
+                alt="React Bootstrap logo"
+              />
+            </Navbar.Brand>
+            <Navbar.Collapse>
+              <Nav className="mr-auto">
+                <Nav.Link active={(view === 'build')} onClick={() => this.setState({ view: 'build' })}>Build</Nav.Link>
+                <Nav.Link active={(view === 'unwind')} onClick={() => this.setState({ view: 'unwind' })}>Unwind</Nav.Link>
+                <Nav.Link active={(view === 'liquidate')} onClick={() => this.setState({ view: 'liquidate' })}>Liquidate</Nav.Link>
+              </Nav>
+            </Navbar.Collapse>
+            {this.renderAccount()}
           </Navbar>
         </div>
         {this.renderModal()}
         {this.renderUnwindModal()}
         <Container className="App">
+          {this.renderAlert()}
           {this.renderSelectFeed()}
           {this.renderMain()}
           {this.renderToasts()}
@@ -1434,18 +1447,18 @@ class App extends Component {
     // Set up listeners for mint/burn events
     const self = this;
     tokenContract.events.Transfer()
-     .on('data', async (event) => {
-       console.log('new token transfer event:', event);
-       if (event.returnValues.from === "0x0000000000000000000000000000000000000000" || event.returnValues.to === "0x0000000000000000000000000000000000000000") {
-         // mint
-         console.log('previous supply', supply);
+      .on('data', async (event) => {
+        console.log('new token transfer event:', event);
+        if (event.returnValues.from === "0x0000000000000000000000000000000000000000" || event.returnValues.to === "0x0000000000000000000000000000000000000000") {
+          // mint
+          console.log('previous supply', supply);
 
-         const fetchedSupply = await tokenContract.methods.totalSupply().call();
-         const newSupply = parseFloat(fetchedSupply);
-         self.setState({ total: { supply: newSupply, decimals: decimals } });
-         console.log('new supply', newSupply);
-       }
-     });
+          const fetchedSupply = await tokenContract.methods.totalSupply().call();
+          const newSupply = parseFloat(fetchedSupply);
+          self.setState({ total: { supply: newSupply, decimals: decimals } });
+          console.log('new supply', newSupply);
+        }
+      });
   }
 
   // Initializes the current feed ...
