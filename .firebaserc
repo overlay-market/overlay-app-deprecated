@@ -1,5 +1,17 @@
 {
   "projects": {
     "default": "overlay-app-91fc7"
+  },
+  "targets": {
+    "overlay-app-91fc7": {
+      "hosting": {
+        "overlay-app-prod": [
+          "overlay-app-91fc7"
+        ],
+        "overlay-app-staging": [
+          "overlay-app-staging"
+        ]
+      }
+    }
   }
 }
