@@ -60,6 +60,7 @@ class App extends Component {
     this.getLiquidatablePositions = this.getLiquidatablePositions.bind(this);
     this.buildPosition = this.buildPosition.bind(this);
     this.unwindPosition = this.unwindPosition.bind(this);
+    this.liquidatePosition = this.liquidatePosition.bind(this);
 
     this.state = {
       total: {},
@@ -546,6 +547,50 @@ class App extends Component {
       console.error(err);
       this.setState({ loadingTrade: false });
       alert(`Error executing trade: ${err.message}`);
+    }
+  }
+
+  liquidatePosition = async (posId) => {
+    const { feed, account } = this.state;
+    try {
+      console.log('pos id', posId);
+
+      if (!posId) {
+        throw new Error('Need pos to liquidate');
+      } else if (!account) {
+        throw new Error('Need account to liquidate');
+      }
+
+      // Mark as loading
+      // this.setState({ loadingTrade: true });
+
+      const eth = new Eth(window.ethereum);
+      const fPosContract = new eth.Contract(config.dev.ovlFPositionABI, feed.marketAddress);
+      // console.log('amount to send', this.applyBaseFactor(parseFloat(amount), total.decimals));
+      console.log('pos id to send', posId);
+
+      const self = this;
+      fPosContract.methods.liquidate(
+        posId,
+      ).send({ 'from': account })
+        .on('transactionHash', (hash) => {
+          // Update state based on position, balances
+          self.addPendingTxHash(hash);
+          //self.setState({ amount: '', loadingTrade: false });
+        })
+        .on('receipt', (receipt) => {
+          // TODO: update pos in feed attrs ...
+          console.log('receipt', receipt);
+          // self.setState({ feeds, feed });
+        })
+        .on('error', (error) => {
+          console.error(error);
+          // TODO: alert ...
+        });
+    } catch (err) {
+      console.error(err);
+      //this.setState({ loadingTrade: false });
+      alert(`Error executing liquidation: ${err.message}`);
     }
   }
 
@@ -1176,12 +1221,11 @@ class App extends Component {
   }
 
   renderLiquidate() {
-    const { feed, feeds, total } = this.state;
+    const { feed, feeds, total, account } = this.state;
     return (
       <div className="pb-5">
         <hr />
         <h5>Outstanding Liquidatable Positions</h5>
-        <small className="text-secondary"><strong>Reward: 50% of total OVL locked (less fees)</strong></small>
         <div className="d-flex flex-wrap justify-content-between">
           {Object.values(feed.positionsLiquidatable).map((pos) => (
             <Card key={pos.id} className="m-2" style={{ width: '18rem' }}>
@@ -1197,7 +1241,7 @@ class App extends Component {
                 </Card.Text>
               </Card.Body>
               <Card.Footer>
-                <Button variant="primary" size="sm" onClick={() => console.log('Liquidate modal!')}>Liquidate Position</Button>
+                <Button variant="primary" size="sm" onClick={async () => this.liquidatePosition(pos.id)} disabled={account === null}>Liquidate Position</Button>
               </Card.Footer>
             </Card>
           ))}
