@@ -870,6 +870,15 @@ class App extends Component {
     this.setState({ pendingTxHashes, showPendingTx: true });
   }
 
+  getPendingTxHashURL(hash) {
+    const networkName = Object.keys(chains).find(key => chains[key] === hostNetworkVersion);
+    if (networkName === "mainnet") {
+      return `https://etherscan.io/tx/${hash}`;
+    } else {
+      return `https://${networkName}.etherscan.io/tx/${hash}`;
+    }
+  }
+
   removePendingTxHash(hash) {
     var { pendingTxHashes } = this.state;
     const i = pendingTxHashes.indexOf(hash);
@@ -892,7 +901,7 @@ class App extends Component {
           <Toast.Header>
             <strong className="mr-auto">Submitted</strong>
           </Toast.Header>
-          <Toast.Body><strong>Tx Hash:</strong> <a href={`https://rinkeby.etherscan.io/tx/${hash}`} target="_blank">{`${hash.substring(0, 8)}...${hash.substring(hash.length - 8, hash.length)}`}</a></Toast.Body>
+          <Toast.Body><strong>Tx Hash:</strong> <a href={this.getPendingTxHashURL(hash)} target="_blank">{`${hash.substring(0, 8)}...${hash.substring(hash.length - 8, hash.length)}`}</a></Toast.Body>
         </Toast>
       </Navbar>
     );
