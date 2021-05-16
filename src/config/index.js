@@ -1,2 +1,3 @@
+import contracts from './contracts';
 import dev from './development';
-export default { dev };
+export default { contracts, dev };

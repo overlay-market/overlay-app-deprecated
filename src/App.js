@@ -42,6 +42,12 @@ import AlertDismissible from './components/alertDismissible';
 
 library.add(faSync);
 
+var hostNetworkVersion = "4"; // rinkeby default, for now ...
+var chains = { "rinkeby": "4", "kovan": "42" };
+if (window.location.hostname.split(".")[0] in chains) {
+  hostNetworkVersion = chains[window.location.hostname.split(".")[0]];
+}
+
 class App extends Component {
   constructor(props, context) {
     super(props, context);
@@ -68,158 +74,14 @@ class App extends Component {
       allowance: 999999999999 * 1e18,
       positions: null,
       balance: null,
-      tokenAddress: '0x1c8D468bFdc4D7c153e34811de191AD08A33a278',
-      claimAddress: '0xd9d75715bbeeA371357642e0aFbd6DC4113A6B8E',
+      tokenAddress: config.contracts[hostNetworkVersion].tokenAddress,
+      claimAddress: config.contracts[hostNetworkVersion].claimAddress,
       hasClaimed: false,
       amountToClaim: 0,
       posToUnwind: null,
-      feeds: {
-        'CHAINLINK-BTCUSD': {
-          name: 'BTC / USD',
-          symbol: 'CHAINLINK-BTCUSD',
-          chartSymbol: 'COINBASE:BTCUSD',
-          price: '',
-          period: '',
-          rounds: 8,
-          decimals: 8,
-          feedAddress: '0x3aaAdBE9A830c54245F74E6E578ecA81482ec970',
-          feedABIType: 'ovlChainlinkFeedABI',
-          feedDataSourceAddress: '0xECe365B379E1dD183B20fc5f022230C044d51404',
-          marketAddress: '0xec0d838f6A6ad46EF29D56EFeE39C7ce4CfA8B95',
-          denom: 'USD',
-          open: [],
-          liquidatable: [],
-          positions: [],
-          positionsLiquidatable: [],
-        },
-        'CHAINLINK-ETHUSD': {
-          name: 'ETH / USD',
-          symbol: 'CHAINLINK-ETHUSD',
-          chartSymbol: 'COINBASE:ETHUSD',
-          price: '',
-          period: '',
-          rounds: 8,
-          decimals: 8,
-          feedAddress: '0x131D62b8D89712F0927d080f2afdbed289c477dB',
-          feedABIType: 'ovlChainlinkFeedABI',
-          feedDataSourceAddress: '0x8A753747A1Fa494EC906cE90E9f37563A8AF630e',
-          marketAddress: '0xAc0BbA891576640d12019cD6449c3DFbF74683eA',
-          denom: 'USD',
-          open: [],
-          liquidatable: [],
-          positions: [],
-          positionsLiquidatable: [],
-        },
-        'CHAINLINK-DAIUSD': {
-          name: 'DAI / USD',
-          symbol: 'CHAINLINK-DAIUSD',
-          chartSymbol: 'COINBASE:DAIUSD',
-          price: '',
-          period: '',
-          rounds: 8,
-          decimals: 8,
-          feedAddress: '0xF94284d95946229F16d3CB1a61ad47Ae02757cfe',
-          feedABIType: 'ovlChainlinkFeedABI',
-          feedDataSourceAddress: '0x2bA49Aaa16E6afD2a993473cfB70Fa8559B523cF',
-          marketAddress: '0xf73AEa5eBBcaED32e505044981C16A625043c376',
-          denom: 'USD',
-          open: [],
-          liquidatable: [],
-          positions: [],
-          positionsLiquidatable: [],
-        },
-        'CHAINLINK-FASTGAS': {
-          name: 'Fast Gas / Gwei',
-          symbol: 'CHAINLINK-FASTGAS',
-          chartSymbol: 'CHAINLINK:FASTGAS',
-          price: '',
-          period: '',
-          rounds: 8,
-          decimals: 0,
-          feedAddress: '',
-          feedABIType: 'ovlChainlinkFeedABI',
-          feedDataSourceAddress: '',
-          marketAddress: '',
-          denom: 'ETH',
-          open: [],
-          liquidatable: [],
-          positions: [],
-          positionsLiquidatable: [],
-        },
-        'UNISWAP-WBTCWETH': {
-          name: 'Wrapped BTC / ETH',
-          symbol: 'UNISWAP-WBTCWETH',
-          chartSymbol: 'UNISWAP:WBTCWETH',
-          price: '',
-          period: '',
-          rounds: 8,
-          decimals: 0,
-          feedAddress: '',
-          feedABIType: 'ovlUniswapV2FeedABI',
-          feedDataSourceAddress: '',
-          marketAddress: '',
-          denom: 'ETH',
-          open: [],
-          liquidatable: [],
-          positions: [],
-          positionsLiquidatable: [],
-        },
-        'UNISWAP-DAIWETH': {
-          name: 'DAI / ETH',
-          symbol: 'UNISWAP-DAIWETH',
-          chartSymbol: 'UNISWAP:DAIWETH',
-          price: '',
-          period: '',
-          rounds: 8,
-          decimals: 0,
-          feedAddress: '',
-          feedABIType: 'ovlUniswapV2FeedABI',
-          feedDataSourceAddress: '',
-          marketAddress: '',
-          denom: 'ETH',
-          open: [],
-          liquidatable: [],
-          positions: [],
-          positionsLiquidatable: [],
-        },
-        'UNISWAP-OVLWETH': {
-          name: 'OVL / ETH',
-          symbol: 'UNISWAP-OVLWETH',
-          chartSymbol: 'UNISWAP:OVLWETH',
-          price: '',
-          period: '',
-          rounds: 8,
-          decimals: 0,
-          feedAddress: '',
-          feedABIType: 'ovlUniswapV2FeedABI',
-          feedDataSourceAddress: '',
-          marketAddress: '',
-          denom: 'ETH',
-          open: [],
-          liquidatable: [],
-          positions: [],
-          positionsLiquidatable: [],
-        }
-      },
+      feeds: config.contracts[hostNetworkVersion].feeds,
       inviteCode: '',
-      feed: {
-        name: 'BTC / USD',
-        symbol: 'CHAINLINK-BTCUSD',
-        chartSymbol: 'COINBASE:BTCUSD',
-        price: '',
-        period: '',
-        rounds: 8,
-        decimals: 8,
-        feedAddress: '0x3aaAdBE9A830c54245F74E6E578ecA81482ec970',
-        feedABIType: 'ovlChainlinkFeedABI',
-        feedDataSourceAddress: '0xECe365B379E1dD183B20fc5f022230C044d51404',
-        marketAddress: '0xec0d838f6A6ad46EF29D56EFeE39C7ce4CfA8B95',
-        denom: 'USD',
-        open: [],
-        liquidatable: [],
-        positions: [],
-        positionsLiquidatable: [],
-      },
+      feed: config.contracts[hostNetworkVersion].feeds["CHAINLINK-BTCUSD"],
       show: false,
       showUnwindModal: false,
       pendingTxHashes: [],
@@ -1318,9 +1180,12 @@ class App extends Component {
       const account = accounts[0];
 
       // Check whether conditions met to trade w account
-      if (ethereum.networkVersion !== '4') {
-        alert('This application only works on Rinkeby Test Network ... for now');
+      if (!(ethereum.networkVersion in config.contracts)) {
+        alert(`This application only works on ${Object.keys(chains)} ... for now`);
         return;
+      } else if (ethereum.networkVersion !== hostNetworkVersion) {
+        const networkName = Object.keys(chains).find(key => chains[key] === hostNetworkVersion);
+        alert(`Connect to ${networkName} to trade`);
       } else if (!account) {
         alert('Create a MetaMask account to trade');
         return;

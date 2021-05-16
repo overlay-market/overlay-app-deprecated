@@ -10,6 +10,12 @@
         ],
         "overlay-app-staging": [
           "overlay-app-staging"
+        ],
+        "rinkeby": [
+          "overlay-app-rinkeby"
+        ],
+        "kovan": [
+          "overlay-app-kovan"
         ]
       }
     }
