@@ -42,7 +42,7 @@ import AlertDismissible from './components/alertDismissible';
 
 library.add(faSync);
 
-var hostNetworkVersion = "4"; // rinkeby default, for now ...
+var hostNetworkVersion = "42"; // kovan default, for now ...
 var chains = { "rinkeby": "4", "kovan": "42" };
 if (window.location.hostname.split(".")[0] in chains) {
   hostNetworkVersion = chains[window.location.hostname.split(".")[0]];
